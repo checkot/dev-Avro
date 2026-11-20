@@ -7,8 +7,8 @@ A fast, ad-free, open-source Android keyboard built on top of [OpenRidmik](https
 - **Avro Phonetic & Bangla Layouts:** Full Avro phonetic Bangla, English, Probhat, and Jatiyo layouts with 75,000-word suggestions, emoji panel, clipboard history, number pad, and customizable themes.
 - **Ridmik-Style Symbol Hints:** Quick long-press symbol hints (`৳`, `%`, `_`, `;`, `<`, `>`, `+`, `=`, `[`, `]`, `@`, `#`, `&`, `*`, `-`, `!`, `?`, `(`, `)`, `"`, `'`, `:`, `/`) across English and Avro layouts, plus `x`/`c`/`v` long-press cut/copy/paste.
 - **On-Screen PC Developer Layout (2 Swipeable Pages):**
-  - Slide the **Spacebar** left/right to switch to **Developer** layout (`Esc`, `Tab`, `Shift`, `Alt`, `⌘`, `Ctrl`, number/symbol row, and coding symbol hints).
-  - Swipe left/right across the main **Developer** keyboard body to flip to **Page 2** (`F1–F12`, `↑ ↓ ← →` arrow keys, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, and `Cut`/`Copy`/`Paste`).
+  - Tap the **`</>`** button in the top toolbar to switch to **Developer PC** layout (`Esc`, `Tab`, `Shift`, `Alt`, `⌘`, `Ctrl`, number/symbol row, and coding symbol hints).
+  - Tap the **`PC`** button in the top toolbar again to switch to **`Fn` (Page 2)** (`F1–F12`, `↑ ↓ ← →` arrow keys, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, and `Cut`/`Copy`/`Paste`).
   - Every key dispatches real Android `KeyEvent`s with active `Ctrl`/`Alt`/`Shift`/`Meta` modifier states (ideal for Termux, code editors, and terminals).
 - **Developer Mode (Custom Hardware Shortcuts & Macros):**
   - Default **OFF** so normal typing is never affected.

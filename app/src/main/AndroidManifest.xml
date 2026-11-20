@@ -38,6 +38,11 @@
             android:exported="false"
             android:label="AI Voice Typing" />
 
+        <activity
+            android:name=".KeymapGuideActivity"
+            android:exported="false"
+            android:label="Avro Typing Guide" />
+
         <provider
             android:name=".ApkFileProvider"
             android:authorities="${applicationId}.apkprovider"

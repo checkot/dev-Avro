@@ -14,7 +14,6 @@ object Prefs {
         "lang_avro" to true,
         "lang_probhat" to false,
         "lang_jatiyo" to false,
-        "lang_dev" to true,
         "developer_mode" to false,
     )
 
@@ -33,9 +32,9 @@ object Prefs {
         set(c, "developer_mode", enabled)
     }
 
-    /** Layouts the user wants to switch between, as indexes: 0 = English, 1 = Avro, 2 = Probhat, 3 = Jatiyo, 4 = Developer (never empty). */
+    /** Layouts the user switches via spacebar: 0 = English, 1 = Avro, 2 = Probhat, 3 = Jatiyo (never empty). */
     fun enabledLangs(c: Context): List<Int> {
-        val l = listOf("lang_en", "lang_avro", "lang_probhat", "lang_jatiyo", "lang_dev")
+        val l = listOf("lang_en", "lang_avro", "lang_probhat", "lang_jatiyo")
             .mapIndexedNotNull { i, k -> if (get(c, k)) i else null }
         return l.ifEmpty { listOf(0) }
     }
@@ -44,12 +43,6 @@ object Prefs {
 
     fun setBangla(c: Context, bangla: Boolean) {
         sp(c).edit().putString("lang", if (bangla) "bn" else "en").apply()
-    }
-
-    fun isDeveloperLayout(c: Context): Boolean = sp(c).getString("lang", "en") == "dev"
-
-    fun setDeveloperLayout(c: Context) {
-        sp(c).edit().putString("lang", "dev").apply()
     }
 
     /** Bangla typing layout: "avro" (phonetic), "probhat" or "jatiyo" (fixed). */

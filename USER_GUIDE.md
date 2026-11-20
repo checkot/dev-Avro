@@ -7,10 +7,10 @@
 4. **Quick symbols:** Long-press any letter key to type its corner symbol (`৳`, `%`, `_`, `;`, `<`, `>`, `+`, `=`, `[`, `]`, `@`, `#`, `&`, `*`, `-`, `!`, `?`, `(`, `)`, `"`, `'`, `:`, `/`). Long-press `x` / `c` / `v` for Cut / Copy / Paste.
 
 ## 2. Using the On-Screen PC Developer Layout
-1. Slide the **Spacebar** until it shows **Developer**.
+1. Tap the **`</>`** button in the top toolbar (where the book icon used to be; the Avro Typing Guide is now inside **Settings → Avro Typing Guide**).
 2. **Page 1 (PC Coding Layout):** Includes `Esc`, `Tab`, `Shift`, `Alt`, `⌘`, `Ctrl`, number/symbol row, and coding symbols on every letter key.
    - Tap `Ctrl`, `Alt`, or `⌘` once to highlight it (sticky modifier), then tap the next key (e.g., `Ctrl` → `C`, `Ctrl` → `V`, `Ctrl` → `Z`, `Ctrl` → `L` in Termux).
-3. **Page 2 (Function Keys & Navigation):** Swipe your finger left or right across the main Developer keyboard body to switch to **Developer · Fn** (`F1–F12`, `↑ ↓ ← →`, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, `Cut`, `Copy`, `Paste`). Swipe again or tap **ABC** to return to Page 1.
+3. **Page 2 (Function Keys & Navigation):** Tap **`PC`** in the top toolbar again to switch to **`Fn` (Developer · Fn)** (`F1–F12`, `↑ ↓ ← →`, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, `Cut`, `Copy`, `Paste`). Tap **`Fn`** again to return to your normal keyboard, or tap **ABC** to return to PC Page 1.
 
 ## 3. Setting Up Gemini AI Live Voice Typing
 1. Open **My Avro Keyboard** → scroll to **Developer Mode** → tap **AI Voice Typing (Gemini)**.

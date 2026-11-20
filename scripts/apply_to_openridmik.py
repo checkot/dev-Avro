@@ -26,6 +26,7 @@ OVERLAY_FILES = [
     "app/src/main/java/com/devfahim00/openridmik/ApkUpdater.kt",
     "app/src/main/java/com/devfahim00/openridmik/GeminiVoiceEngine.kt",
     "app/src/main/java/com/devfahim00/openridmik/VoiceSettingsActivity.kt",
+    "app/src/main/java/com/devfahim00/openridmik/KeymapGuideActivity.kt",
     "app/src/main/java/com/devfahim00/openridmik/DeveloperKeyboard.kt",
     "app/src/main/java/com/devfahim00/openridmik/Shortcut.kt",
     "app/src/main/java/com/devfahim00/openridmik/ShortcutRepository.kt",
@@ -208,6 +209,7 @@ SVC_FIELD_REPLACE = """    private var gearBtn: IconView? = null
     private var devCtrl = false
     private var devAlt = false
     private var devMeta = false
+    private var devBtn: TextView? = null
     private var micBtn: MicIconView? = null
     private var consumedShortcutKeyCode: Int = KeyEvent.KEYCODE_UNKNOWN"""
 
@@ -258,7 +260,7 @@ SVC_START_VIEW_REPLACE = """    override fun onStartInput(attribute: EditorInfo?
 SVC_LANG_INIT_ANCHOR = """        bangla = if (forceLatin) false else Prefs.isBangla(this)
         probhat = Prefs.layout(this) == "probhat"
         jatiyo = Prefs.layout(this) == "jatiyo\""""
-SVC_LANG_INIT_REPLACE = """        developer = !forceLatin && Prefs.isDeveloperLayout(this)
+SVC_LANG_INIT_REPLACE = """        developer = false
         bangla = if (forceLatin || developer) false else Prefs.isBangla(this)
         probhat = Prefs.layout(this) == "probhat"
         jatiyo = Prefs.layout(this) == "jatiyo"
@@ -284,7 +286,7 @@ SVC_REBUILD_ROWS_REPLACE = """            Mode.ALPHA -> if (developer) {
 
 SVC_SPACE_LABEL_ANCHOR = """        kbView.spaceLabel = when {
             !bangla -> "English\""""
-SVC_SPACE_LABEL_REPLACE = """        kbView.boardSwipeEnabled = (mode == Mode.ALPHA && developer)
+SVC_SPACE_LABEL_REPLACE = """        kbView.boardSwipeEnabled = false
         kbView.activeModifiers = devModifierMask()
         kbView.spaceLabel = when {
             developer -> if (devPage == 0) "Developer" else "Developer · Fn"
@@ -347,12 +349,9 @@ SVC_CURRENT_LANG_REPLACE = """    /** 0 = English, 1 = Avro (phonetic), 2 = Prob
     private fun setLang(idx: Int) {
         currentInputConnection?.let { finishComposing(it) }
         applyLangFlags(idx)
-        if (developer) {
-            if (!forceLatin) Prefs.setDeveloperLayout(this)
-        } else {
-            if (bangla) Prefs.setLayout(this, if (probhat) "probhat" else if (jatiyo) "jatiyo" else "avro")
-            if (!forceLatin) Prefs.setBangla(this, bangla)
-        }
+        developer = false
+        if (bangla) Prefs.setLayout(this, if (probhat) "probhat" else if (jatiyo) "jatiyo" else "avro")
+        if (!forceLatin) Prefs.setBangla(this, bangla)
         shift = 0
         rebuild()
         updateAutoCap()
@@ -598,6 +597,73 @@ def patch_openridmik_service(target: Path) -> None:
         last_b = src.rfind("}")
         src = src[:last_b] + voice_methods + "\n}\n"
 
+
+    # Replace toolbar book icon (Ico.KEYMAP) with 3-state Developer selector (</> -> PC -> Fn -> </>)
+    if "cycleDeveloperToolbar()" not in src:
+        src = replace_once(
+            src,
+            "        tool(Ico.KEYMAP) { showKeyMap() }",
+            """        devBtn = TextView(this).apply {
+            text = "</>"
+            textSize = 13.5f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(theme.text)
+            setOnClickListener { cycleDeveloperToolbar() }
+        }
+        toolbarButtons.add(devBtn!!)
+        toolbar.addView(devBtn, lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))""",
+            "OpenRidmikService replace KEYMAP with devBtn",
+            "devBtn = TextView(this)",
+        )
+        src = src.replace(
+            "        refreshMicUi()",
+            """        refreshDevBtnUi()
+        refreshMicUi()""",
+        )
+        dev_toolbar_methods = """
+    private fun refreshDevBtnUi() {
+        val btn = devBtn ?: return
+        when {
+            !developer -> {
+                btn.text = "</>"
+                btn.setTextColor(if (::theme.isInitialized) theme.text else 0xFF000000.toInt())
+            }
+            devPage == 0 -> {
+                btn.text = "PC"
+                btn.setTextColor(if (::theme.isInitialized) theme.accent else 0xFF2563EB.toInt())
+            }
+            else -> {
+                btn.text = "Fn"
+                btn.setTextColor(if (::theme.isInitialized) theme.accent else 0xFF2563EB.toInt())
+            }
+        }
+    }
+
+    private fun cycleDeveloperToolbar() {
+        currentInputConnection?.let { finishComposing(it) }
+        hidePanel()
+        clearDevModifiers()
+        if (!developer) {
+            developer = true
+            devPage = 0
+            mode = Mode.ALPHA
+        } else if (devPage == 0) {
+            devPage = 1
+            mode = Mode.ALPHA
+        } else {
+            developer = false
+            devPage = 0
+            mode = Mode.ALPHA
+        }
+        shift = 0
+        rebuild()
+        refreshDevBtnUi()
+    }
+"""
+        last_b = src.rfind("}")
+        src = src[:last_b] + dev_toolbar_methods + "\n}\n"
+
     svc.write_text(src, encoding="utf-8")
     print("[OK] Patched OpenRidmikService.kt")
 
@@ -611,8 +677,7 @@ SETTINGS_TITLE_OLD = 'addView(text("OpenRidmik", 30f, fg, bold = true))'
 SETTINGS_TITLE_NEW = 'addView(text("My Avro Keyboard", 28f, fg, bold = true))'
 
 SETTINGS_LANG_ANCHOR = '        langRow(false, "Probhat", "lang_probhat")'
-SETTINGS_LANG_REPLACE = """        langRow(false, "Probhat", "lang_probhat")
-        langRow(false, "Developer (PC · Fn · Arrows)", "lang_dev")"""
+SETTINGS_LANG_REPLACE = """        langRow(false, "Probhat", "lang_probhat")"""
 
 SETTINGS_DIAG_ANCHOR = "        // ---- keyboard keeps switching? ----"
 SETTINGS_DEV_SECTION = """        // ---- developer mode (separated from ordinary keyboard settings) ----
@@ -625,6 +690,9 @@ SETTINGS_DEV_SECTION = """        // ---- developer mode (separated from ordinar
         voiceStatus = text("", 14f, muted)
         row(devCard, false, "AI Voice Typing (Gemini)", voiceStatus) {
             startActivity(Intent(this, VoiceSettingsActivity::class.java))
+        }
+        row(devCard, false, "Avro Typing Guide (Keymap)", chevron()) {
+            startActivity(Intent(this, KeymapGuideActivity::class.java))
         }
         updateDevModeSummary()
 
