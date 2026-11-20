@@ -558,6 +558,35 @@ def patch_settings_activity(target: Path) -> None:
     print("[OK] Patched SettingsActivity.kt")
 
 
+
+def patch_layouts(target: Path) -> None:
+    lay = target / "app/src/main/java/com/devfahim00/openridmik/Layouts.kt"
+    if not lay.exists():
+        return
+    src = lay.read_text(encoding="utf-8").replace("\r\n", "\n")
+    symbol_hint_block = """    private val symbolHint = mapOf(
+        'q' to "\u09F3", 'w' to "%", 'e' to "_", 'r' to ";", 't' to "<",
+        'y' to ">", 'u' to "+", 'i' to "=", 'o' to "[", 'p' to "]",
+        'a' to "@", 's' to "#", 'd' to "&", 'f' to "*", 'g' to "-",
+        'h' to "!", 'j' to "?", 'k' to "(", 'l' to ")",
+        'z' to "\"", 'b' to "'", 'n' to ":", 'm' to "/",
+    )"""
+    if "private val symbolHint" not in src:
+        src = re.sub(
+            r"    private val lowerHint = mapOf\(.*?\n    \)",
+            symbol_hint_block,
+            src,
+            count=1,
+            flags=re.DOTALL,
+        )
+        src = src.replace(
+            "val hint = if (bangla) (if (shift) upperHint[c] else lowerHint[c]) else null",
+            "val hint = if (shift) (if (bangla) upperHint[c] else null) ?: symbolHint[raw] else symbolHint[raw]",
+        )
+    lay.write_text(src, encoding="utf-8")
+    print("[OK] Patched Layouts.kt with Ridmik-style symbol hints")
+
+
 def patch_updater(target: Path) -> None:
     upd = target / "app/src/main/java/com/devfahim00/openridmik/Updater.kt"
     if not upd.exists():
@@ -591,6 +620,7 @@ def main() -> int:
     patch_keyboard_view(target)
     patch_openridmik_service(target)
     patch_settings_activity(target)
+    patch_layouts(target)
     patch_updater(target)
 
     print("\nAll My Avro Keyboard modules and patches applied cleanly!")
