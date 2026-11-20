@@ -38,6 +38,13 @@ jobs:
             git push
           fi
 
+      - name: Install fixed debug signing keystore (enables seamless updates)
+        if: hashFiles('signing/myavro-debug.keystore') != ''
+        run: |
+          mkdir -p "$HOME/.android"
+          cp signing/myavro-debug.keystore "$HOME/.android/debug.keystore"
+          echo "Installed fixed debug keystore at $HOME/.android/debug.keystore"
+
       - name: Clone official OpenRidmik base (if My Avro project present)
         if: hashFiles('scripts/apply_to_openridmik.py') != ''
         run: |
@@ -62,7 +69,7 @@ jobs:
         working-directory: openridmik_base
         run: |
           gradle testDebugUnitTest assembleDebug --stacktrace \
-            -PappVersion="1.0.0" \
+            -PappVersion="1.0.${{ github.run_number }}" \
             -PappVersionCode="${{ github.run_number }}"
 
       - name: Upload MyAvroKeyboard-debug.apk artifact
@@ -83,5 +90,5 @@ jobs:
           gh release create "$TAG" MyAvroKeyboard-debug.apk \
             --target "${GITHUB_SHA}" \
             --prerelease \
-            --title "My Avro Keyboard (Latest Debug Build)" \
-            --notes "Auto-extracted and built from uploaded ZIP."
+            --title "My Avro Keyboard (v1.0.${{ github.run_number }})" \
+            --notes "Auto-extracted and built from uploaded ZIP with consistent signing."
