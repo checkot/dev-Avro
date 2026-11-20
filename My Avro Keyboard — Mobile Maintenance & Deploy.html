@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Avro Keyboard — Mobile Maintenance &amp; Deploy</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+  <div class="max-w-lg mx-auto px-4 py-6 space-y-5">
+    <header class="flex items-center justify-between gap-3">
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-white">My Avro Maintenance</h1>
+        <p class="text-xs text-slate-400">Upload ZIP to GitHub root &amp; track APK builds from your phone</p>
+      </div>
+      <span id="connBadge" class="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">Ready</span>
+    </header>
+
+    <!-- In-page toast/status banner -->
+    <div id="statusBox" class="hidden rounded-xl border px-3.5 py-3 text-sm leading-relaxed"></div>
+
+    <!-- GitHub Config Card -->
+    <section class="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-3.5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">1. GitHub Connection</h2>
+        <button id="clearPatBtn" type="button" class="text-xs text-rose-400 hover:text-rose-300 font-medium">Clear saved PAT</button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2.5">
+        <div class="col-span-2">
+          <label for="repoInput" class="block text-xs text-slate-400 mb-1">Repository (owner/repo)</label>
+          <input id="repoInput" type="text" value="checkot/dev-Avro" placeholder="owner/repo"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+        <div>
+          <label for="branchInput" class="block text-xs text-slate-400 mb-1">Branch</label>
+          <input id="branchInput" type="text" value="main" placeholder="main"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+      </div>
+
+      <div>
+        <label for="patInput" class="block text-xs text-slate-400 mb-1">GitHub Personal Access Token (PAT)</label>
+        <div class="flex gap-2">
+          <input id="patInput" type="password" placeholder="ghp_... or github_pat_..."
+            class="flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500" />
+          <button id="togglePatBtn" type="button"
+            class="rounded-xl bg-slate-800 hover:bg-slate-700 px-3 py-2.5 text-xs font-medium text-slate-200">Show</button>
+        </div>
+        <label class="mt-2 inline-flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+          <input id="rememberPatCheck" type="checkbox" checked class="rounded border-slate-600 bg-slate-950 text-sky-500" />
+          <span>Save PAT in this browser only (localStorage)</span>
+        </label>
+      </div>
+
+      <p class="text-[11px] text-slate-400 leading-relaxed">
+        Needs a GitHub token with <span class="text-slate-200 font-medium">Contents (Read &amp; Write)</span> and
+        <span class="text-slate-200 font-medium">Actions (Read)</span> permissions. Token is sent only to <span class="text-slate-200">api.github.com</span>.
+      </p>
+    </section>
+
+    <!-- Upload ZIP Card -->
+    <section class="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-3.5">
+      <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">2. Upload ZIP to Root</h2>
+
+      <label for="zipInput"
+        class="block rounded-xl border-2 border-dashed border-slate-700 hover:border-sky-500 bg-slate-950/60 p-4 text-center cursor-pointer transition">
+        <input id="zipInput" type="file" accept=".zip,application/zip" class="hidden" />
+        <div id="fileLabel" class="text-sm font-medium text-slate-200">Tap to choose MyAvroKeyboard-Project.zip</div>
+        <div id="fileMeta" class="text-xs text-slate-400 mt-1">Uploads directly to repository root &amp; triggers build</div>
+      </label>
+
+      <div>
+        <label for="commitMsgInput" class="block text-xs text-slate-400 mb-1">Commit Message</label>
+        <input id="commitMsgInput" type="text" value="Upload project ZIP via mobile maintenance"
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-3 py-2.5 text-sm text-white focus:outline-none focus:border-sky-500" />
+      </div>
+
+      <button id="uploadBtn" type="button"
+        class="w-full rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 disabled:opacity-50 py-3 px-4 text-sm font-semibold text-white transition">
+        Upload ZIP to Root &amp; Trigger Build
+      </button>
+    </section>
+
+    <!-- Live Status & Latest APK Card -->
+    <section class="rounded-2xl bg-slate-900 border border-slate-800 p-4 space-y-3.5">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-200 uppercase tracking-wider">3. Build Status &amp; Latest APK</h2>
+        <button id="refreshBtn" type="button"
+          class="rounded-lg bg-slate-800 hover:bg-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200">Refresh</button>
+      </div>
+
+      <div id="releaseCard" class="rounded-xl bg-slate-950 border border-slate-800 p-3.5 text-xs text-slate-400">
+        Tap Refresh to load latest release &amp; workflow runs.
+      </div>
+
+      <div id="runsList" class="space-y-2 text-xs"></div>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      const LS_PAT = "myavro_maint_pat";
+      const LS_REPO = "myavro_maint_repo";
+      const LS_BRANCH = "myavro_maint_branch";
+
+      const repoInput = document.getElementById("repoInput");
+      const branchInput = document.getElementById("branchInput");
+      const patInput = document.getElementById("patInput");
+      const rememberPatCheck = document.getElementById("rememberPatCheck");
+      const togglePatBtn = document.getElementById("togglePatBtn");
+      const clearPatBtn = document.getElementById("clearPatBtn");
+      const zipInput = document.getElementById("zipInput");
+      const fileLabel = document.getElementById("fileLabel");
+      const fileMeta = document.getElementById("fileMeta");
+      const commitMsgInput = document.getElementById("commitMsgInput");
+      const uploadBtn = document.getElementById("uploadBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const statusBox = document.getElementById("statusBox");
+      const connBadge = document.getElementById("connBadge");
+      const releaseCard = document.getElementById("releaseCard");
+      const runsList = document.getElementById("runsList");
+
+      let selectedFile = null;
+      let pollTimer = null;
+
+      function safeGet(key) {
+        try { return localStorage.getItem(key) || ""; } catch (_) { return ""; }
+      }
+      function safeSet(key, val) {
+        try { localStorage.setItem(key, val); } catch (_) {}
+      }
+      function safeRemove(key) {
+        try { localStorage.removeItem(key); } catch (_) {}
+      }
+
+      function initSaved() {
+        const r = safeGet(LS_REPO);
+        const b = safeGet(LS_BRANCH);
+        const p = safeGet(LS_PAT);
+        if (r) repoInput.value = r;
+        if (b) branchInput.value = b;
+        if (p) patInput.value = p;
+      }
+
+      function showStatus(msg, type) {
+        statusBox.textContent = msg;
+        statusBox.className = "rounded-xl border px-3.5 py-3 text-sm leading-relaxed ";
+        if (type === "error") {
+          statusBox.className += "bg-rose-950/60 border-rose-700 text-rose-200";
+        } else if (type === "success") {
+          statusBox.className += "bg-emerald-950/60 border-emerald-700 text-emerald-200";
+        } else {
+          statusBox.className += "bg-sky-950/60 border-sky-700 text-sky-200";
+        }
+      }
+
+      function setBadge(text, colorClass) {
+        connBadge.textContent = text;
+        connBadge.className = "text-xs font-medium px-2.5 py-1 rounded-full " + colorClass;
+      }
+
+      function ghHeaders(pat) {
+        const h = {
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28"
+        };
+        if (pat) h["Authorization"] = "Bearer " + pat;
+        return h;
+      }
+
+      function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        const chunk = 0x8000;
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += chunk) {
+          binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        return btoa(binary);
+      }
+
+      function persistConfig() {
+        safeSet(LS_REPO, repoInput.value.trim());
+        safeSet(LS_BRANCH, branchInput.value.trim() || "main");
+        if (rememberPatCheck.checked && patInput.value.trim()) {
+          safeSet(LS_PAT, patInput.value.trim());
+        } else if (!rememberPatCheck.checked) {
+          safeRemove(LS_PAT);
+        }
+      }
+
+      togglePatBtn.addEventListener("click", function () {
+        const hidden = patInput.type === "password";
+        patInput.type = hidden ? "text" : "password";
+        togglePatBtn.textContent = hidden ? "Hide" : "Show";
+      });
+
+      clearPatBtn.addEventListener("click", function () {
+        patInput.value = "";
+        safeRemove(LS_PAT);
+        showStatus("Saved PAT cleared from this browser.", "info");
+      });
+
+      zipInput.addEventListener("change", function () {
+        selectedFile = zipInput.files && zipInput.files[0] ? zipInput.files[0] : null;
+        if (!selectedFile) {
+          fileLabel.textContent = "Tap to choose MyAvroKeyboard-Project.zip";
+          fileMeta.textContent = "Uploads directly to repository root & triggers build";
+          return;
+        }
+        const kb = (selectedFile.size / 1024).toFixed(1);
+        fileLabel.textContent = selectedFile.name;
+        fileMeta.textContent = kb + " KB selected — ready to upload to root";
+      });
+
+      async function uploadZip() {
+        const repo = repoInput.value.trim();
+        const branch = branchInput.value.trim() || "main";
+        const pat = patInput.value.trim();
+
+        if (!repo || !repo.includes("/")) {
+          showStatus("Please enter a valid repository like checkot/dev-Avro.", "error");
+          return;
+        }
+        if (!pat) {
+          showStatus("Please paste your GitHub Personal Access Token (PAT) first.", "error");
+          return;
+        }
+        if (!selectedFile) {
+          showStatus("Please select a .zip file first.", "error");
+          return;
+        }
+        if (!selectedFile.name.toLowerCase().endsWith(".zip")) {
+          showStatus("Only .zip files can be uploaded here.", "error");
+          return;
+        }
+
+        persistConfig();
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = "Uploading...";
+        setBadge("Uploading", "bg-sky-900 text-sky-200");
+        showStatus("Checking repository root and encoding ZIP...", "info");
+
+        try {
+          const fileName = encodeURIComponent(selectedFile.name);
+          const apiBase = "https://api.github.com/repos/" + repo + "/contents/" + fileName;
+
+          let existingSha = null;
+          const headRes = await fetch(apiBase + "?ref=" + encodeURIComponent(branch), {
+            headers: ghHeaders(pat)
+          });
+          if (headRes.ok) {
+            const existing = await headRes.json();
+            existingSha = existing.sha || null;
+          } else if (headRes.status !== 404) {
+            const errBody = await headRes.json().catch(function () { return {}; });
+            throw new Error(errBody.message || ("GitHub check failed (" + headRes.status + ")"));
+          }
+
+          const buf = await selectedFile.arrayBuffer();
+          const b64 = arrayBufferToBase64(buf);
+          const payload = {
+            message: commitMsgInput.value.trim() || ("Upload " + selectedFile.name),
+            content: b64,
+            branch: branch
+          };
+          if (existingSha) payload.sha = existingSha;
+
+          const putRes = await fetch(apiBase, {
+            method: "PUT",
+            headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders(pat)),
+            body: JSON.stringify(payload)
+          });
+
+          const putData = await putRes.json().catch(function () { return {}; });
+          if (!putRes.ok) {
+            throw new Error(putData.message || ("Upload failed (" + putRes.status + ")"));
+          }
+
+          setBadge("Build Triggered", "bg-emerald-900 text-emerald-200");
+          showStatus("Uploaded " + selectedFile.name + " to root! GitHub Actions is now extracting & building your APK.", "success");
+          startPolling();
+        } catch (err) {
+          setBadge("Error", "bg-rose-900 text-rose-200");
+          showStatus("Upload error: " + (err && err.message ? err.message : String(err)), "error");
+        } finally {
+          uploadBtn.disabled = false;
+          uploadBtn.textContent = "Upload ZIP to Root & Trigger Build";
+        }
+      }
+
+      async function fetchStatus() {
+        const repo = repoInput.value.trim();
+        const pat = patInput.value.trim();
+        if (!repo || !repo.includes("/")) return;
+
+        persistConfig();
+        try {
+          const [relRes, runsRes] = await Promise.all([
+            fetch("https://api.github.com/repos/" + repo + "/releases/latest", { headers: ghHeaders(pat) }),
+            fetch("https://api.github.com/repos/" + repo + "/actions/runs?per_page=4", { headers: ghHeaders(pat) })
+          ]);
+
+          if (relRes.ok) {
+            const rel = await relRes.json();
+            const apk = (rel.assets || []).find(function (a) { return a.name && a.name.endsWith(".apk"); });
+            releaseCard.innerHTML = "";
+            const row = document.createElement("div");
+            row.className = "flex items-center justify-between gap-3";
+            const info = document.createElement("div");
+            const title = document.createElement("div");
+            title.className = "text-sm font-semibold text-white";
+            title.textContent = rel.name || rel.tag_name || "Latest Release";
+            const sub = document.createElement("div");
+            sub.className = "text-xs text-slate-400 mt-0.5";
+            sub.textContent = "Tag: " + (rel.tag_name || "-") + (apk ? (" · " + (apk.size / 1048576).toFixed(2) + " MB") : "");
+            info.appendChild(title);
+            info.appendChild(sub);
+            row.appendChild(info);
+            if (apk && apk.browser_download_url) {
+              const link = document.createElement("a");
+              link.href = apk.browser_download_url;
+              link.target = "_blank";
+              link.rel = "noopener";
+              link.className = "shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white";
+              link.textContent = "Download APK";
+              row.appendChild(link);
+            }
+            releaseCard.appendChild(row);
+          } else {
+            releaseCard.textContent = "No published latest release found yet (or repo is private without PAT).";
+          }
+
+          runsList.innerHTML = "";
+          if (runsRes.ok) {
+            const runsData = await runsRes.json();
+            const runs = runsData.workflow_runs || [];
+            let active = false;
+            runs.forEach(function (r) {
+              if (r.status === "queued" || r.status === "in_progress") active = true;
+              const item = document.createElement("a");
+              item.href = r.html_url;
+              item.target = "_blank";
+              item.rel = "noopener";
+              item.className = "flex items-center justify-between rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 hover:border-slate-700";
+              const left = document.createElement("div");
+              left.className = "truncate pr-2";
+              left.innerHTML = "<div class='font-medium text-slate-200 truncate'>#" + r.run_number + " · " + (r.display_title || r.name) + "</div>"
+                + "<div class='text-[11px] text-slate-400'>" + new Date(r.created_at).toLocaleString() + "</div>";
+              const badge = document.createElement("span");
+              const ok = r.conclusion === "success";
+              const fail = r.conclusion === "failure";
+              badge.className = "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium "
+                + (ok ? "bg-emerald-900/70 text-emerald-300" : fail ? "bg-rose-900/70 text-rose-300" : "bg-amber-900/70 text-amber-300");
+              badge.textContent = r.status === "completed" ? (r.conclusion || "done") : r.status;
+              item.appendChild(left);
+              item.appendChild(badge);
+              runsList.appendChild(item);
+            });
+            if (!active && pollTimer) {
+              clearInterval(pollTimer);
+              pollTimer = null;
+              setBadge("Idle", "bg-slate-800 text-slate-300");
+            } else if (active) {
+              setBadge("Building...", "bg-amber-900 text-amber-200");
+            }
+          }
+        } catch (err) {
+          showStatus("Could not refresh GitHub status: " + (err && err.message ? err.message : String(err)), "error");
+        }
+      }
+
+      function startPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        fetchStatus();
+        pollTimer = setInterval(fetchStatus, 8000);
+      }
+
+      uploadBtn.addEventListener("click", uploadZip);
+      refreshBtn.addEventListener("click", fetchStatus);
+      initSaved();
+    })();
+  </script>
+</body>
+</html>
