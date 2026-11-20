@@ -3,25 +3,32 @@ package com.devfahim00.openridmik
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
+import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.sqrt
 
 /**
- * Records short voice clips using Android's native [MediaRecorder] (AAC/M4A) and
- * transcribes them via the Gemini Developer REST API (zero external dependencies).
+ * Continuous Auto-Pause Live Speech-to-Text engine powered by Gemini API.
  *
- * Privacy & safety:
- * - API key stays strictly on-device in private SharedPreferences.
- * - Temporary audio file is always deleted immediately after transcription or error.
+ * Uses Android's native [AudioRecord] (16 kHz, 16-bit mono PCM -> WAV) so the microphone
+ * stays continuously open with zero dropped words between sentences:
+ * - Detects natural ~1.1s pauses between sentences and streams each chunk in exact order.
+ * - Uses minimal thinking budget on Gemini Flash-Lite for fast (~1s) transcription.
+ * - Keeps all audio in RAM only (never writes voice recordings to disk).
  */
 object GeminiVoiceEngine {
 
@@ -30,7 +37,13 @@ object GeminiVoiceEngine {
     const val KEY_LANG = "gemini_voice_lang"
     const val KEY_CLEAN = "gemini_voice_clean"
 
-    const val DEFAULT_MODEL = "gemini-2.5-flash"
+    const val DEFAULT_MODEL = "gemini-3.5-flash-lite"
+
+    private const val SAMPLE_RATE = 16000
+    private const val SPEECH_RMS_THRESHOLD = 750.0
+    private const val SILENCE_TRIGGER_MS = 1100L
+    private const val MIN_SPEECH_MS = 350L
+    private const val MAX_CHUNK_MS = 14000L
 
     enum class State { IDLE, RECORDING, TRANSCRIBING }
 
@@ -38,8 +51,10 @@ object GeminiVoiceEngine {
     var state: State = State.IDLE
         private set
 
-    private var recorder: MediaRecorder? = null
-    private var audioFile: File? = null
+    private val running = AtomicBoolean(false)
+    private val pendingChunks = AtomicInteger(0)
+    private var captureThread: Thread? = null
+    private var uploadExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
 
     fun hasMicPermission(c: Context): Boolean =
@@ -55,111 +70,228 @@ object GeminiVoiceEngine {
 
     fun isConfigured(c: Context): Boolean = hasMicPermission(c) && apiKey(c).isNotEmpty()
 
-    /** Starts recording to a temporary M4A file in cacheDir. Returns null on success or an error message. */
-    fun startRecording(c: Context): String? {
-        if (state != State.IDLE) return "Voice engine is busy."
-        if (!hasMicPermission(c)) return "Microphone permission is required."
-        if (apiKey(c).isEmpty()) return "Please add your free Gemini API key in AI Voice Settings."
-
-        return try {
-            val out = File(c.cacheDir, "myavro_voice.m4a")
-            if (out.exists()) out.delete()
-
-            @Suppress("DEPRECATION")
-            val mr = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(c) else MediaRecorder()
-            mr.setAudioSource(MediaRecorder.AudioSource.MIC)
-            mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            mr.setAudioSamplingRate(16000)
-            mr.setAudioEncodingBitRate(32000)
-            mr.setAudioChannels(1)
-            mr.setMaxDuration(60_000)
-            mr.setOutputFile(out.absolutePath)
-            mr.prepare()
-            mr.start()
-
-            recorder = mr
-            audioFile = out
-            state = State.RECORDING
-            null
-        } catch (e: Exception) {
-            releaseRecorder()
-            state = State.IDLE
-            "Could not start microphone: " + (e.message ?: "unknown error")
-        }
-    }
-
-    /** Stops recording and transcribes the captured audio asynchronously via Gemini API. */
-    fun stopAndTranscribe(
+    /**
+     * Starts continuous live listening. Each spoken phrase is automatically flushed on
+     * a short pause (or when stopped) and delivered to [onChunkText] in exact spoken order.
+     */
+    fun startLiveSession(
         c: Context,
-        onSuccess: (String) -> Unit,
+        onChunkText: (String) -> Unit,
+        onStateChanged: () -> Unit,
         onError: (String) -> Unit,
-    ) {
-        if (state != State.RECORDING) {
-            onError("Not currently recording.")
-            return
+    ): String? {
+        if (running.get()) return null
+        if (!hasMicPermission(c)) return "Microphone permission is required."
+        val key = apiKey(c)
+        if (key.isEmpty()) return "Please add your free Gemini API key in AI Voice Settings."
+
+        val minBuf = AudioRecord.getMinBufferSize(
+            SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        )
+        if (minBuf <= 0) return "Audio recording is not supported on this device."
+
+        val recorder = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBuf * 2, SAMPLE_RATE),
+            )
+        } catch (e: Exception) {
+            return "Could not initialize microphone: " + (e.message ?: "unknown error")
         }
+
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+            recorder.release()
+            return "Could not initialize microphone."
+        }
+
         val app = c.applicationContext
-        val file = audioFile
-        try {
-            recorder?.stop()
-        } catch (_: Exception) {
-            releaseRecorder()
-            file?.delete()
-            state = State.IDLE
-            onError("Recording was too short. Please speak and tap Mic again.")
-            return
-        }
-        releaseRecorder()
-
-        if (file == null || !file.exists() || file.length() < 512L) {
-            file?.delete()
-            state = State.IDLE
-            onError("No speech captured. Please try again.")
-            return
-        }
-
-        state = State.TRANSCRIBING
-        val key = apiKey(app)
         val mdl = model(app)
         val prompt = buildPrompt(langMode(app), cleanPunctuation(app))
 
-        Thread {
+        if (uploadExecutor.isShutdown) {
+            uploadExecutor = Executors.newSingleThreadExecutor()
+        }
+
+        running.set(true)
+        state = State.RECORDING
+        main.post { onStateChanged() }
+
+        captureThread = Thread {
+            val pcmBuffer = ByteArrayOutputStream(SAMPLE_RATE * 4)
+            val frame = ShortArray(800) // 50ms @ 16kHz
+            var hasSpeech = false
+            var speechMs = 0L
+            var silenceMs = 0L
+            var chunkMs = 0L
+
             try {
-                val bytes = file.readBytes()
-                val text = callGeminiTranscribe(key, mdl, prompt, bytes)
-                main.post {
-                    state = State.IDLE
-                    if (text.isEmpty()) {
-                        onError("Could not detect speech in the recording.")
-                    } else {
-                        onSuccess(text)
+                recorder.startRecording()
+                while (running.get()) {
+                    val read = recorder.read(frame, 0, frame.size)
+                    if (read <= 0) continue
+
+                    val frameMs = (read * 1000L) / SAMPLE_RATE
+                    val rms = computeRms(frame, read)
+
+                    if (rms >= SPEECH_RMS_THRESHOLD) {
+                        hasSpeech = true
+                        speechMs += frameMs
+                        silenceMs = 0L
+                    } else if (hasSpeech) {
+                        silenceMs += frameMs
+                    }
+
+                    if (hasSpeech) {
+                        appendLittleEndian(pcmBuffer, frame, read)
+                        chunkMs += frameMs
+                    }
+
+                    val pauseReached = hasSpeech && speechMs >= MIN_SPEECH_MS && silenceMs >= SILENCE_TRIGGER_MS
+                    val maxReached = hasSpeech && chunkMs >= MAX_CHUNK_MS
+
+                    if (pauseReached || maxReached) {
+                        val pcmBytes = pcmBuffer.toByteArray()
+                        pcmBuffer.reset()
+                        hasSpeech = false
+                        speechMs = 0L
+                        silenceMs = 0L
+                        chunkMs = 0L
+                        enqueueChunk(pcmBytes, key, mdl, prompt, onChunkText, onStateChanged, onError)
                     }
                 }
-            } catch (e: Exception) {
-                main.post {
-                    state = State.IDLE
-                    onError(e.message ?: "Gemini transcription failed.")
+
+                // Flush remaining spoken audio when user taps Mic to stop
+                if (hasSpeech && speechMs >= MIN_SPEECH_MS && pcmBuffer.size() > 0) {
+                    val pcmBytes = pcmBuffer.toByteArray()
+                    pcmBuffer.reset()
+                    enqueueChunk(pcmBytes, key, mdl, prompt, onChunkText, onStateChanged, onError)
                 }
+            } catch (e: Exception) {
+                val msg = e.message ?: "recording error"
+                main.post { onError("Mic error: $msg") }
             } finally {
-                try { file.delete() } catch (_: Exception) {}
-                audioFile = null
+                try { recorder.stop() } catch (_: Exception) {}
+                try { recorder.release() } catch (_: Exception) {}
+                running.set(false)
+                updateState(onStateChanged)
             }
-        }.start()
+        }
+        captureThread?.start()
+        return null
     }
 
-    /** Immediately cancels any active recording and deletes temporary audio. */
+    /** Stops live recording cleanly and lets any final spoken phrase finish transcribing. */
+    fun stopLiveSession(onStateChanged: () -> Unit) {
+        running.set(false)
+        updateState(onStateChanged)
+    }
+
+    /** Immediately stops recording without waiting (used when keyboard closes). */
     fun cancel() {
-        try {
-            if (state == State.RECORDING) {
-                recorder?.stop()
-            }
-        } catch (_: Exception) {
+        running.set(false)
+        if (pendingChunks.get() == 0) {
+            state = State.IDLE
         }
-        releaseRecorder()
-        try { audioFile?.delete() } catch (_: Exception) {}
-        audioFile = null
-        if (state == State.RECORDING) state = State.IDLE
+    }
+
+    private fun updateState(onStateChanged: () -> Unit) {
+        state = when {
+            running.get() -> State.RECORDING
+            pendingChunks.get() > 0 -> State.TRANSCRIBING
+            else -> State.IDLE
+        }
+        main.post { onStateChanged() }
+    }
+
+    private fun enqueueChunk(
+        pcmBytes: ByteArray,
+        key: String,
+        mdl: String,
+        prompt: String,
+        onChunkText: (String) -> Unit,
+        onStateChanged: () -> Unit,
+        onError: (String) -> Unit,
+    ) {
+        pendingChunks.incrementAndGet()
+        updateState(onStateChanged)
+        val wavBytes = wrapWavHeader(pcmBytes, SAMPLE_RATE)
+
+        uploadExecutor.execute {
+            try {
+                val text = callGeminiTranscribe(key, mdl, prompt, wavBytes)
+                if (text.isNotEmpty()) {
+                    main.post { onChunkText(text) }
+                }
+            } catch (e: Exception) {
+                val msg = e.message ?: "Gemini transcription failed."
+                main.post { onError(msg) }
+            } finally {
+                pendingChunks.decrementAndGet()
+                updateState(onStateChanged)
+            }
+        }
+    }
+
+    private fun computeRms(buf: ShortArray, count: Int): Double {
+        var sum = 0.0
+        for (i in 0 until count) {
+            val v = buf[i].toDouble()
+            sum += v * v
+        }
+        return sqrt(sum / count.coerceAtLeast(1))
+    }
+
+    private fun appendLittleEndian(out: ByteArrayOutputStream, buf: ShortArray, count: Int) {
+        for (i in 0 until count) {
+            val s = buf[i].toInt()
+            out.write(s and 0xFF)
+            out.write((s shr 8) and 0xFF)
+        }
+    }
+
+    private fun wrapWavHeader(pcm: ByteArray, sampleRate: Int): ByteArray {
+        val totalDataLen = pcm.size + 36
+        val byteRate = sampleRate * 2 // 16-bit mono
+        val header = ByteArray(44)
+        header[0] = 'R'.code.toByte(); header[1] = 'I'.code.toByte()
+        header[2] = 'F'.code.toByte(); header[3] = 'F'.code.toByte()
+        writeIntLE(header, 4, totalDataLen)
+        header[8] = 'W'.code.toByte(); header[9] = 'A'.code.toByte()
+        header[10] = 'V'.code.toByte(); header[11] = 'E'.code.toByte()
+        header[12] = 'f'.code.toByte(); header[13] = 'm'.code.toByte()
+        header[14] = 't'.code.toByte(); header[15] = ' '.code.toByte()
+        writeIntLE(header, 16, 16)
+        writeShortLE(header, 20, 1) // PCM
+        writeShortLE(header, 22, 1) // Mono
+        writeIntLE(header, 24, sampleRate)
+        writeIntLE(header, 28, byteRate)
+        writeShortLE(header, 32, 2) // Block align
+        writeShortLE(header, 34, 16) // Bits per sample
+        header[36] = 'd'.code.toByte(); header[37] = 'a'.code.toByte()
+        header[38] = 't'.code.toByte(); header[39] = 'a'.code.toByte()
+        writeIntLE(header, 40, pcm.size)
+
+        val wav = ByteArray(44 + pcm.size)
+        System.arraycopy(header, 0, wav, 0, 44)
+        System.arraycopy(pcm, 0, wav, 44, pcm.size)
+        return wav
+    }
+
+    private fun writeIntLE(b: ByteArray, offset: Int, v: Int) {
+        b[offset] = (v and 0xFF).toByte()
+        b[offset + 1] = ((v shr 8) and 0xFF).toByte()
+        b[offset + 2] = ((v shr 16) and 0xFF).toByte()
+        b[offset + 3] = ((v shr 24) and 0xFF).toByte()
+    }
+
+    private fun writeShortLE(b: ByteArray, offset: Int, v: Int) {
+        b[offset] = (v and 0xFF).toByte()
+        b[offset + 1] = ((v shr 8) and 0xFF).toByte()
     }
 
     /** Quick text-only API key test used from VoiceSettingsActivity. */
@@ -198,7 +330,7 @@ object GeminiVoiceEngine {
                     } else if (code == 400 || code == 403) {
                         onResult(false, "Invalid API key (HTTP $code). Check your key in Google AI Studio.")
                     } else if (code == 404) {
-                        onResult(false, "Model '$mdl' not found (HTTP 404). Try another Flash model ID.")
+                        onResult(false, "Model '$mdl' not found (HTTP 404). Try gemini-3.5-flash-lite.")
                     } else if (code == 429) {
                         onResult(false, "Rate limit reached (HTTP 429). Wait a moment and try again.")
                     } else {
@@ -206,55 +338,54 @@ object GeminiVoiceEngine {
                     }
                 }
             } catch (e: Exception) {
-                main.post { onResult(false, "Network error: " + (e.message ?: "check internet")) }
+                val msg = e.message ?: "check internet"
+                main.post { onResult(false, "Network error: $msg") }
             }
         }.start()
-    }
-
-    private fun releaseRecorder() {
-        try { recorder?.reset() } catch (_: Exception) {}
-        try { recorder?.release() } catch (_: Exception) {}
-        recorder = null
     }
 
     private fun buildPrompt(lang: String, clean: Boolean): String {
         val langRule = when (lang) {
             "bn" -> "Transcribe the spoken audio strictly in natural Bengali (Bangla script)."
             "en" -> "Transcribe the spoken audio strictly in natural English."
-            else -> "Transcribe the spoken audio accurately. If the speaker speaks Bengali (Bangla), write in Bangla script; if they mix English technical words, keep those English words naturally; if they speak English, write in English."
+            else -> "Transcribe the spoken audio accurately. Write Bengali in Bangla script; keep English technical words naturally; write English in English."
         }
         val cleanRule = if (clean) {
-            "Add natural punctuation (। , ? !) and remove filler sounds like um/uh."
+            "Add natural punctuation and remove filler sounds."
         } else {
-            "Keep the transcription verbatim with minimal edits."
+            "Keep verbatim with minimal edits."
         }
-        return "$langRule $cleanRule Output ONLY the final transcribed text with no quotes, no prefixes, and no explanations."
+        return "$langRule $cleanRule Return ONLY the transcribed text. If silence or noise only, return empty string."
     }
 
-    private fun callGeminiTranscribe(apiKey: String, model: String, prompt: String, audioBytes: ByteArray): String {
+    private fun callGeminiTranscribe(apiKey: String, model: String, prompt: String, wavBytes: ByteArray): String {
         val encodedKey = URLEncoder.encode(apiKey, "UTF-8")
         val url = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$encodedKey")
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
-        conn.connectTimeout = 15000
-        conn.readTimeout = 30000
+        conn.connectTimeout = 12000
+        conn.readTimeout = 25000
         conn.doOutput = true
         conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
 
-        val b64 = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
+        val b64 = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
         val parts = JSONArray()
             .put(JSONObject().put("text", prompt))
             .put(
                 JSONObject().put(
                     "inline_data",
                     JSONObject()
-                        .put("mime_type", "audio/mp4")
+                        .put("mime_type", "audio/wav")
                         .put("data", b64),
                 ),
             )
+        val genConfig = JSONObject()
+        if (model.startsWith("gemini-3")) {
+            genConfig.put("thinkingConfig", JSONObject().put("thinkingLevel", "MINIMAL"))
+        }
         val payload = JSONObject()
             .put("contents", JSONArray().put(JSONObject().put("parts", parts)))
-            .put("generationConfig", JSONObject().put("temperature", 0.1))
+            .put("generationConfig", genConfig)
 
         try {
             conn.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
@@ -264,8 +395,8 @@ object GeminiVoiceEngine {
             if (code !in 200..299) {
                 val msg = when (code) {
                     400, 403 -> "Invalid Gemini API key (HTTP $code)."
-                    404 -> "Gemini model '$model' not found (HTTP 404)."
-                    429 -> "Gemini free quota limit reached (HTTP 429). Try again shortly."
+                    404 -> "Model '$model' not found (HTTP 404)."
+                    429 -> "Free quota limit reached (HTTP 429). Try again shortly."
                     else -> "Gemini API error (HTTP $code)."
                 }
                 throw IllegalStateException(msg)
@@ -323,17 +454,14 @@ class MicIconView(ctx: Context) : android.view.View(ctx) {
         stroke.strokeWidth = 2f * unit
         fill.color = color
 
-        // Mic capsule
         val capsule = android.graphics.RectF(x(9f), y(2f), x(15f), y(13f))
         if (recording) {
             canvas.drawRoundRect(capsule, 3f * unit, 3f * unit, fill)
         } else {
             canvas.drawRoundRect(capsule, 3f * unit, 3f * unit, stroke)
         }
-        // U-shaped cradle
         val arc = android.graphics.RectF(x(5.5f), y(6f), x(18.5f), y(17.5f))
         canvas.drawArc(arc, 0f, 180f, false, stroke)
-        // Stem & base
         canvas.drawLine(x(12f), y(17.5f), x(12f), y(21.5f), stroke)
         canvas.drawLine(x(8.5f), y(21.5f), x(15.5f), y(21.5f), stroke)
 

@@ -550,33 +550,27 @@ def patch_openridmik_service(target: Path) -> None:
         }
     }
 
+    private fun commitVoiceText(text: String) {
+        val ic = currentInputConnection ?: return
+        if (MacroExecutor.isPasswordField(currentInputEditorInfo)) return
+        if (raw.isNotEmpty()) finishComposing(ic)
+        val before = try { ic.getTextBeforeCursor(1, 0)?.toString() ?: "" } catch (_: Exception) { "" }
+        val needsSpace = before.isNotEmpty() && !before[0].isWhitespace()
+        ic.commitText(if (needsSpace) " $text" else text, 1)
+    }
+
     private fun toggleGeminiVoice() {
         if (MacroExecutor.isPasswordField(currentInputEditorInfo)) {
             Toast.makeText(this, "Voice typing is disabled in password fields", Toast.LENGTH_SHORT).show()
             return
         }
         when (GeminiVoiceEngine.state) {
-            GeminiVoiceEngine.State.TRANSCRIBING -> {
-                Toast.makeText(this, "Converting speech with Gemini AI…", Toast.LENGTH_SHORT).show()
-            }
             GeminiVoiceEngine.State.RECORDING -> {
-                Toast.makeText(this, "Converting speech…", Toast.LENGTH_SHORT).show()
-                GeminiVoiceEngine.stopAndTranscribe(
-                    this,
-                    onSuccess = { text ->
-                        refreshMicUi()
-                        val ic = currentInputConnection
-                        if (ic != null && !MacroExecutor.isPasswordField(currentInputEditorInfo)) {
-                            if (raw.isNotEmpty()) finishComposing(ic)
-                            ic.commitText(text, 1)
-                        }
-                    },
-                    onError = { err ->
-                        refreshMicUi()
-                        Toast.makeText(this, err, Toast.LENGTH_SHORT).show()
-                    },
-                )
-                refreshMicUi()
+                GeminiVoiceEngine.stopLiveSession { refreshMicUi() }
+                Toast.makeText(this, "Mic stopped", Toast.LENGTH_SHORT).show()
+            }
+            GeminiVoiceEngine.State.TRANSCRIBING -> {
+                Toast.makeText(this, "Finishing last sentence…", Toast.LENGTH_SHORT).show()
             }
             GeminiVoiceEngine.State.IDLE -> {
                 if (!GeminiVoiceEngine.isConfigured(this)) {
@@ -585,11 +579,16 @@ def patch_openridmik_service(target: Path) -> None:
                     startActivity(i)
                     return
                 }
-                val err = GeminiVoiceEngine.startRecording(this)
+                val err = GeminiVoiceEngine.startLiveSession(
+                    this,
+                    onChunkText = { text -> commitVoiceText(text) },
+                    onStateChanged = { refreshMicUi() },
+                    onError = { msg -> Toast.makeText(this, msg, Toast.LENGTH_SHORT).show() },
+                )
                 if (err != null) {
                     Toast.makeText(this, err, Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this, "Listening… Tap Mic to stop", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Live Mic ON — pause briefly to type, tap Mic to stop", Toast.LENGTH_SHORT).show()
                 }
                 refreshMicUi()
             }
