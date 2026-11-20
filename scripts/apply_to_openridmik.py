@@ -22,6 +22,8 @@ OVERLAY_FILES = [
     "app/src/main/AndroidManifest.xml",
     "app/src/main/res/values/strings.xml",
     "app/src/main/java/com/devfahim00/openridmik/Prefs.kt",
+    "app/src/main/java/com/devfahim00/openridmik/ApkFileProvider.kt",
+    "app/src/main/java/com/devfahim00/openridmik/ApkUpdater.kt",
     "app/src/main/java/com/devfahim00/openridmik/DeveloperKeyboard.kt",
     "app/src/main/java/com/devfahim00/openridmik/Shortcut.kt",
     "app/src/main/java/com/devfahim00/openridmik/ShortcutRepository.kt",
@@ -538,6 +540,31 @@ def patch_settings_activity(target: Path) -> None:
         src = src.replace(SETTINGS_TITLE_OLD, SETTINGS_TITLE_NEW, 1)
     src = replace_once(src, SETTINGS_LANG_ANCHOR, SETTINGS_LANG_REPLACE, "SettingsActivity lang_dev", '"lang_dev"')
     src = replace_once(src, SETTINGS_DIAG_ANCHOR, SETTINGS_DEV_SECTION, "SettingsActivity dev section", "DeveloperSettingsActivity")
+    # Upgrade update banner to download & install APK in-app instead of opening browser
+    if "ApkUpdater.downloadAndInstall" not in src:
+        src = re.sub(
+            r'banner\.addView\(text\("Tap to download", 13f, onAccent\)\.apply \{ alpha = 0\.85f \}\)',
+            'val bannerSub = text("Tap to download & install", 13f, onAccent).apply { alpha = 0.85f }\n        banner.addView(bannerSub)',
+            src,
+            count=1,
+        )
+        src = re.sub(
+            r'banner\.setOnClickListener \{\s*val url = info\.apkUrl\.ifEmpty \{ info\.pageUrl \}\s*if \(url\.isNotEmpty\(\)\) startActivity\(Intent\(Intent\.ACTION_VIEW, Uri\.parse\(url\)\)\)\s*\}',
+            lambda _m: (
+                'bannerSub.text = "Tap to download & install in-app"\n'
+                '            banner.setOnClickListener {\n'
+                '                if (info.apkUrl.isNotEmpty()) {\n'
+                '                    ApkUpdater.downloadAndInstall(this, info.apkUrl) { msg -> bannerSub.text = msg }\n'
+                '                } else if (info.pageUrl.isNotEmpty()) {\n'
+                '                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.pageUrl)))\n'
+                '                }\n'
+                '            }'
+            ),
+            src,
+            count=1,
+            flags=re.DOTALL,
+        )
+
     # Remove the upstream Telegram channel button cleanly
     src = re.sub(
         r'\n\s*// ---- telegram ----.*?(?=\n\s*setContentView\()',
