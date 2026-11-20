@@ -512,34 +512,23 @@ def patch_openridmik_service(target: Path) -> None:
             "OpenRidmikService micBtn init",
             "micBtn = MicIconView",
         )
-        src = replace_once(
-            src,
-            "        strip.addView(toggleBtn, lp(dp(40), LinearLayout.LayoutParams.MATCH_PARENT))",
-            """        strip.addView(toggleBtn, lp(dp(40), LinearLayout.LayoutParams.MATCH_PARENT))""",
-            "OpenRidmikService strip anchor",
-            "NEVER_MATCH_KEEP",
-        )
-        # Add micBtn to the end of strip right before root.addView(strip, ...)
-        src = re.sub(
-            r"(root\.addView\(strip,)",
-            r"micBtn?.let { strip.addView(it, lp(dp(42), LinearLayout.LayoutParams.MATCH_PARENT)) }
-        ",
-            src,
-            count=1,
-        )
-        # Cancel active mic recording cleanly in onFinishInputView
         src = src.replace(
-            "        UserDict.save(this)",
-            "        GeminiVoiceEngine.cancel()
-        refreshMicUi()
-        UserDict.save(this)",
+            "        root.addView(strip,",
+            """        micBtn?.let { strip.addView(it, lp(dp(42), LinearLayout.LayoutParams.MATCH_PARENT)) }
+        root.addView(strip,""",
             1,
         )
-        # Keep micBtn synced with theme color when theme changes
+        src = src.replace(
+            "        UserDict.save(this)",
+            """        GeminiVoiceEngine.cancel()
+        refreshMicUi()
+        UserDict.save(this)""",
+            1,
+        )
         src = src.replace(
             "toggleBtn.setTextColor(theme.hint)",
-            "toggleBtn.setTextColor(theme.hint)
-        refreshMicUi()",
+            """toggleBtn.setTextColor(theme.hint)
+        refreshMicUi()""",
             1,
         )
         voice_methods = """
@@ -608,9 +597,7 @@ def patch_openridmik_service(target: Path) -> None:
     }
 """
         last_b = src.rfind("}")
-        src = src[:last_b] + voice_methods + "
-}
-"
+        src = src[:last_b] + voice_methods + "\n}\n"
 
     svc.write_text(src, encoding="utf-8")
     print("[OK] Patched OpenRidmikService.kt")
@@ -618,7 +605,8 @@ def patch_openridmik_service(target: Path) -> None:
 
 SETTINGS_CLASS_ANCHOR = "class SettingsActivity : Activity() {"
 SETTINGS_CLASS_REPLACE = """class SettingsActivity : Activity() {
-    private var devModeStatus: TextView? = null"""
+    private var devModeStatus: TextView? = null
+    private var voiceStatus: TextView? = null"""
 
 SETTINGS_TITLE_OLD = 'addView(text("OpenRidmik", 30f, fg, bold = true))'
 SETTINGS_TITLE_NEW = 'addView(text("My Avro Keyboard", 28f, fg, bold = true))'
@@ -635,6 +623,10 @@ SETTINGS_DEV_SECTION = """        // ---- developer mode (separated from ordinar
         row(devCard, true, "Hardware Shortcuts & Macros", devModeStatus) {
             startActivity(Intent(this, DeveloperSettingsActivity::class.java))
         }
+        voiceStatus = text("", 14f, muted)
+        row(devCard, false, "AI Voice Typing (Gemini)", voiceStatus) {
+            startActivity(Intent(this, VoiceSettingsActivity::class.java))
+        }
         updateDevModeSummary()
 
         // ---- keyboard keeps switching? ----"""
@@ -645,6 +637,7 @@ SETTINGS_HELPER_METHOD = """
         val on = Prefs.isDeveloperMode(this)
         val count = ShortcutRepository.loadAll(this).size
         statusView.text = if (on) "ON · $count" else "OFF ›"
+        voiceStatus?.text = if (GeminiVoiceEngine.isConfigured(this)) "Ready ›" else "Setup ›"
     }
 """
 

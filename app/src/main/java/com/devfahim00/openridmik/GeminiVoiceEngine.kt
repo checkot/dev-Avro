@@ -85,7 +85,7 @@ object GeminiVoiceEngine {
         } catch (e: Exception) {
             releaseRecorder()
             state = State.IDLE
-            "Could not start microphone: ${e.message ?: "unknown error"}"
+            "Could not start microphone: " + (e.message ?: "unknown error")
         }
     }
 
@@ -206,7 +206,7 @@ object GeminiVoiceEngine {
                     }
                 }
             } catch (e: Exception) {
-                main.post { onResult(false, "Network error: ${e.message ?: "check internet"}") }
+                main.post { onResult(false, "Network error: " + (e.message ?: "check internet")) }
             }
         }.start()
     }
