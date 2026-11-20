@@ -1,0 +1,90 @@
+package com.devfahim00.openridmik
+
+import android.content.Context
+
+object Prefs {
+    private val DEFAULTS = mapOf(
+        "haptic" to true,
+        "sound" to false,
+        "numberRow" to true,
+        "suggestions" to true,
+        "banglaDigits" to true,
+        "clipboard" to true,
+        "lang_en" to true,
+        "lang_avro" to true,
+        "lang_probhat" to false,
+        "lang_jatiyo" to false,
+        "developer_mode" to false,
+    )
+
+    private fun sp(c: Context) = c.getSharedPreferences("openridmik", Context.MODE_PRIVATE)
+
+    fun get(c: Context, key: String): Boolean = sp(c).getBoolean(key, DEFAULTS[key] ?: false)
+
+    fun set(c: Context, key: String, value: Boolean) {
+        sp(c).edit().putBoolean(key, value).apply()
+    }
+
+    /** Developer Mode toggle (defaults to OFF). When OFF, custom hardware shortcuts never execute. */
+    fun isDeveloperMode(c: Context): Boolean = get(c, "developer_mode")
+
+    fun setDeveloperMode(c: Context, enabled: Boolean) {
+        set(c, "developer_mode", enabled)
+    }
+
+    /** Layouts the user wants to switch between, as indexes: 0 = English, 1 = Avro, 2 = Probhat, 3 = Jatiyo (never empty). */
+    fun enabledLangs(c: Context): List<Int> {
+        val l = listOf("lang_en", "lang_avro", "lang_probhat", "lang_jatiyo").mapIndexedNotNull { i, k -> if (get(c, k)) i else null }
+        return l.ifEmpty { listOf(0) }
+    }
+
+    fun isBangla(c: Context): Boolean = sp(c).getString("lang", "en") == "bn"
+
+    fun setBangla(c: Context, bangla: Boolean) {
+        sp(c).edit().putString("lang", if (bangla) "bn" else "en").apply()
+    }
+
+    /** Bangla typing layout: "avro" (phonetic), "probhat" or "jatiyo" (fixed). */
+    fun layout(c: Context): String = sp(c).getString("layout", "avro") ?: "avro"
+
+    fun setLayout(c: Context, layout: String) {
+        sp(c).edit().putString("layout", layout).apply()
+    }
+
+    /** Theme id: "system", one of the presets in [Themes], or "custom". */
+    fun theme(c: Context): String = sp(c).getString("theme", "system") ?: "system"
+
+    fun setTheme(c: Context, id: String) {
+        sp(c).edit().putString("theme", id).apply()
+    }
+
+    fun hasCustomTheme(c: Context): Boolean = sp(c).contains("custom_bg")
+
+    fun customColor(c: Context, name: String, def: Int): Int = sp(c).getInt("custom_$name", def)
+
+    fun setCustomColors(c: Context, bg: Int, key: Int, text: Int, accent: Int) {
+        sp(c).edit()
+            .putInt("custom_bg", bg)
+            .putInt("custom_key", key)
+            .putInt("custom_text", text)
+            .putInt("custom_accent", accent)
+            .apply()
+    }
+
+    /** Keyboard height as a percentage of the default (separate for portrait and landscape). */
+    const val HEIGHT_MIN = 60
+    const val HEIGHT_MAX = 140
+
+    fun heightPercent(c: Context, landscape: Boolean): Int =
+        sp(c).getInt(if (landscape) "height_land" else "height_port", 100).coerceIn(HEIGHT_MIN, HEIGHT_MAX)
+
+    fun setHeightPercent(c: Context, landscape: Boolean, pct: Int) {
+        sp(c).edit().putInt(if (landscape) "height_land" else "height_port", pct.coerceIn(HEIGHT_MIN, HEIGHT_MAX)).apply()
+    }
+
+    fun getString(c: Context, key: String, def: String = ""): String = sp(c).getString(key, def) ?: def
+
+    fun setString(c: Context, key: String, value: String) {
+        sp(c).edit().putString(key, value).apply()
+    }
+}

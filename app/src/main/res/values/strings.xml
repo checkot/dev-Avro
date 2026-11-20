@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">My Avro Keyboard</string>
+    <string name="subtype_bn">বাংলা</string>
+    <string name="subtype_en">English</string>
+</resources>
