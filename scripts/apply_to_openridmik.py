@@ -564,17 +564,19 @@ def patch_layouts(target: Path) -> None:
     if not lay.exists():
         return
     src = lay.read_text(encoding="utf-8").replace("\r\n", "\n")
-    symbol_hint_block = """    private val symbolHint = mapOf(
-        'q' to "\u09F3", 'w' to "%", 'e' to "_", 'r' to ";", 't' to "<",
-        'y' to ">", 'u' to "+", 'i' to "=", 'o' to "[", 'p' to "]",
-        'a' to "@", 's' to "#", 'd' to "&", 'f' to "*", 'g' to "-",
-        'h' to "!", 'j' to "?", 'k' to "(", 'l' to ")",
-        'z' to "\"", 'b' to "'", 'n' to ":", 'm' to "/",
-    )"""
+    symbol_hint_block = (
+        "    private val symbolHint = mapOf(\n"
+        "        'q' to \"\\u09F3\", 'w' to \"%\", 'e' to \"_\", 'r' to \";\", 't' to \"<\",\n"
+        "        'y' to \">\", 'u' to \"+\", 'i' to \"=\", 'o' to \"[\", 'p' to \"]\",\n"
+        "        'a' to \"@\", 's' to \"#\", 'd' to \"&\", 'f' to \"*\", 'g' to \"-\",\n"
+        "        'h' to \"!\", 'j' to \"?\", 'k' to \"(\", 'l' to \")\",\n"
+        "        'z' to \"\\\"\", 'b' to \"'\", 'n' to \":\", 'm' to \"/\",\n"
+        "    )"
+    )
     if "private val symbolHint" not in src:
         src = re.sub(
             r"    private val lowerHint = mapOf\(.*?\n    \)",
-            symbol_hint_block,
+            lambda _m: symbol_hint_block,
             src,
             count=1,
             flags=re.DOTALL,
@@ -585,7 +587,6 @@ def patch_layouts(target: Path) -> None:
         )
     lay.write_text(src, encoding="utf-8")
     print("[OK] Patched Layouts.kt with Ridmik-style symbol hints")
-
 
 def patch_updater(target: Path) -> None:
     upd = target / "app/src/main/java/com/devfahim00/openridmik/Updater.kt"
