@@ -24,6 +24,8 @@ OVERLAY_FILES = [
     "app/src/main/java/com/devfahim00/openridmik/Prefs.kt",
     "app/src/main/java/com/devfahim00/openridmik/ApkFileProvider.kt",
     "app/src/main/java/com/devfahim00/openridmik/ApkUpdater.kt",
+    "app/src/main/java/com/devfahim00/openridmik/GeminiVoiceEngine.kt",
+    "app/src/main/java/com/devfahim00/openridmik/VoiceSettingsActivity.kt",
     "app/src/main/java/com/devfahim00/openridmik/DeveloperKeyboard.kt",
     "app/src/main/java/com/devfahim00/openridmik/Shortcut.kt",
     "app/src/main/java/com/devfahim00/openridmik/ShortcutRepository.kt",
@@ -206,6 +208,7 @@ SVC_FIELD_REPLACE = """    private var gearBtn: IconView? = null
     private var devCtrl = false
     private var devAlt = false
     private var devMeta = false
+    private var micBtn: MicIconView? = null
     private var consumedShortcutKeyCode: Int = KeyEvent.KEYCODE_UNKNOWN"""
 
 SVC_START_VIEW_ANCHOR = "    override fun onStartInputView(info: EditorInfo, restarting: Boolean) {"
@@ -495,6 +498,120 @@ def patch_openridmik_service(target: Path) -> None:
         if not m:
             raise RuntimeError("Anchor not found for OpenRidmikService currentLang/setLang")
         src = src[:m.start()] + SVC_CURRENT_LANG_REPLACE + src[m.end():]
+
+    # Attach 1-tap Gemini Voice Mic button to the right side of the top strip
+    if "toggleGeminiVoice()" not in src:
+        src = replace_once(
+            src,
+            "        gearBtn = tool(Ico.GEAR) { openSettings() }",
+            """        gearBtn = tool(Ico.GEAR) { openSettings() }
+        micBtn = MicIconView(this).apply {
+            color = theme.text
+            setOnClickListener { toggleGeminiVoice() }
+        }""",
+            "OpenRidmikService micBtn init",
+            "micBtn = MicIconView",
+        )
+        src = replace_once(
+            src,
+            "        strip.addView(toggleBtn, lp(dp(40), LinearLayout.LayoutParams.MATCH_PARENT))",
+            """        strip.addView(toggleBtn, lp(dp(40), LinearLayout.LayoutParams.MATCH_PARENT))""",
+            "OpenRidmikService strip anchor",
+            "NEVER_MATCH_KEEP",
+        )
+        # Add micBtn to the end of strip right before root.addView(strip, ...)
+        src = re.sub(
+            r"(root\.addView\(strip,)",
+            r"micBtn?.let { strip.addView(it, lp(dp(42), LinearLayout.LayoutParams.MATCH_PARENT)) }
+        ",
+            src,
+            count=1,
+        )
+        # Cancel active mic recording cleanly in onFinishInputView
+        src = src.replace(
+            "        UserDict.save(this)",
+            "        GeminiVoiceEngine.cancel()
+        refreshMicUi()
+        UserDict.save(this)",
+            1,
+        )
+        # Keep micBtn synced with theme color when theme changes
+        src = src.replace(
+            "toggleBtn.setTextColor(theme.hint)",
+            "toggleBtn.setTextColor(theme.hint)
+        refreshMicUi()",
+            1,
+        )
+        voice_methods = """
+    private fun refreshMicUi() {
+        val btn = micBtn ?: return
+        when (GeminiVoiceEngine.state) {
+            GeminiVoiceEngine.State.RECORDING -> {
+                btn.recording = true
+                btn.color = 0xFFEF4444.toInt()
+            }
+            GeminiVoiceEngine.State.TRANSCRIBING -> {
+                btn.recording = false
+                btn.color = if (::theme.isInitialized) theme.accent else 0xFF2563EB.toInt()
+            }
+            GeminiVoiceEngine.State.IDLE -> {
+                btn.recording = false
+                btn.color = if (::theme.isInitialized) theme.text else 0xFF000000.toInt()
+            }
+        }
+    }
+
+    private fun toggleGeminiVoice() {
+        if (MacroExecutor.isPasswordField(currentInputEditorInfo)) {
+            Toast.makeText(this, "Voice typing is disabled in password fields", Toast.LENGTH_SHORT).show()
+            return
+        }
+        when (GeminiVoiceEngine.state) {
+            GeminiVoiceEngine.State.TRANSCRIBING -> {
+                Toast.makeText(this, "Converting speech with Gemini AI…", Toast.LENGTH_SHORT).show()
+            }
+            GeminiVoiceEngine.State.RECORDING -> {
+                Toast.makeText(this, "Converting speech…", Toast.LENGTH_SHORT).show()
+                GeminiVoiceEngine.stopAndTranscribe(
+                    this,
+                    onSuccess = { text ->
+                        refreshMicUi()
+                        val ic = currentInputConnection
+                        if (ic != null && !MacroExecutor.isPasswordField(currentInputEditorInfo)) {
+                            if (raw.isNotEmpty()) finishComposing(ic)
+                            ic.commitText(text, 1)
+                        }
+                    },
+                    onError = { err ->
+                        refreshMicUi()
+                        Toast.makeText(this, err, Toast.LENGTH_SHORT).show()
+                    },
+                )
+                refreshMicUi()
+            }
+            GeminiVoiceEngine.State.IDLE -> {
+                if (!GeminiVoiceEngine.isConfigured(this)) {
+                    Toast.makeText(this, "Set up Gemini API key & microphone permission first", Toast.LENGTH_LONG).show()
+                    val i = Intent(this, VoiceSettingsActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(i)
+                    return
+                }
+                val err = GeminiVoiceEngine.startRecording(this)
+                if (err != null) {
+                    Toast.makeText(this, err, Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Listening… Tap Mic to stop", Toast.LENGTH_SHORT).show()
+                }
+                refreshMicUi()
+            }
+        }
+    }
+"""
+        last_b = src.rfind("}")
+        src = src[:last_b] + voice_methods + "
+}
+"
+
     svc.write_text(src, encoding="utf-8")
     print("[OK] Patched OpenRidmikService.kt")
 
