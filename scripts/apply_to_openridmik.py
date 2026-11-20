@@ -22,6 +22,7 @@ OVERLAY_FILES = [
     "app/src/main/AndroidManifest.xml",
     "app/src/main/res/values/strings.xml",
     "app/src/main/java/com/devfahim00/openridmik/Prefs.kt",
+    "app/src/main/java/com/devfahim00/openridmik/Theme.kt",
     "app/src/main/java/com/devfahim00/openridmik/ApkFileProvider.kt",
     "app/src/main/java/com/devfahim00/openridmik/ApkUpdater.kt",
     "app/src/main/java/com/devfahim00/openridmik/GeminiVoiceEngine.kt",
@@ -198,6 +199,31 @@ def patch_keyboard_view(target: Path) -> None:
         "boardSwipeFired = false\n    }",
     )
 
+
+    # Phase 1: key popup toggle, hide long-press hints toggle, configurable long-press delay
+    if "var showPopup = true" not in src:
+        src = src.replace(
+            "    var boardSwipeEnabled = false",
+            "    var showPopup = true\n    var hideHints = false\n        set(v) { if (field == v) return; field = v; invalidate() }\n    var longPressMs = 250L\n    var boardSwipeEnabled = false",
+            1,
+        )
+        src = src.replace(
+            "val hinted = k.hint != null",
+            "val hinted = k.hint != null && !hideHints",
+            1,
+        )
+        src = src.replace(
+            "k.hint?.let {",
+            "if (!hideHints) k.hint?.let {",
+            1,
+        )
+        src = src.replace(
+            "private fun drawPreview(canvas: Canvas, p: Press) {",
+            "private fun drawPreview(canvas: Canvas, p: Press) {\n        if (!showPopup) return",
+            1,
+        )
+        src = src.replace("handler.postDelayed(p.longRun, 420)", "handler.postDelayed(p.longRun, longPressMs)")
+
     kv.write_text(src, encoding="utf-8")
     print("[OK] Patched KeyboardView.kt")
 
@@ -209,7 +235,7 @@ SVC_FIELD_REPLACE = """    private var gearBtn: IconView? = null
     private var devCtrl = false
     private var devAlt = false
     private var devMeta = false
-    private var devBtn: TextView? = null
+    private var lastSpaceTap = 0L\n    private var devBtn: TextView? = null
     private var micBtn: MicIconView? = null
     private var consumedShortcutKeyCode: Int = KeyEvent.KEYCODE_UNKNOWN"""
 
@@ -663,6 +689,52 @@ def patch_openridmik_service(target: Path) -> None:
 """
         last_b = src.rfind("}")
         src = src[:last_b] + dev_toolbar_methods + "\n}\n"
+
+
+    # Phase 1: pass showPopup, hideHints, longPressMs; double-space Tab/Period; autoCap respect
+    if "kbView.longPressMs" not in src:
+        src = src.replace(
+            "        kbView.boardSwipeEnabled = false",
+            """        kbView.showPopup = Prefs.get(this, "keyPopup")
+        kbView.hideHints = Prefs.get(this, "hideHints")
+        kbView.longPressMs = Prefs.longPressDelayMs(this)
+        kbView.boardSwipeEnabled = false""",
+            1,
+        )
+        src = src.replace(
+            """            Codes.SPACE -> {
+                finishComposing(ic)
+                ic.commitText(" ", 1)""",
+            """            Codes.SPACE -> {
+                finishComposing(ic)
+                val now = System.currentTimeMillis()
+                val dbl = (now - lastSpaceTap) in 1L..350L
+                if (dbl && Prefs.get(this, "doubleSpaceTab")) {
+                    ic.deleteSurroundingText(1, 0)
+                    ic.commitText("\t", 1)
+                    lastSpaceTap = 0L
+                } else if (dbl && Prefs.get(this, "doubleSpacePeriod")) {
+                    ic.deleteSurroundingText(1, 0)
+                    ic.commitText(if (bangla) "\u0964 " else ". ", 1)
+                    lastSpaceTap = 0L
+                } else {
+                    ic.commitText(" ", 1)
+                    lastSpaceTap = now
+                }""",
+            1,
+        )
+        src = src.replace(
+            "    private fun updateAutoCap() {",
+            """    private fun updateAutoCap() {
+        if (!Prefs.get(this, "autoCap")) {
+            if (shift == 1) {
+                shift = 0
+                rebuild()
+            }
+            return
+        }""",
+            1,
+        )
 
     svc.write_text(src, encoding="utf-8")
     print("[OK] Patched OpenRidmikService.kt")

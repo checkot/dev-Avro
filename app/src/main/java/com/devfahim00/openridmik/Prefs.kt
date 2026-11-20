@@ -10,6 +10,11 @@ object Prefs {
         "suggestions" to true,
         "banglaDigits" to true,
         "clipboard" to true,
+        "autoCap" to true,
+        "doubleSpacePeriod" to false,
+        "doubleSpaceTab" to false,
+        "keyPopup" to true,
+        "hideHints" to false,
         "lang_en" to true,
         "lang_avro" to true,
         "lang_probhat" to false,
@@ -30,6 +35,17 @@ object Prefs {
 
     fun setDeveloperMode(c: Context, enabled: Boolean) {
         set(c, "developer_mode", enabled)
+    }
+
+    /** Long-press delay in milliseconds (150ms - 600ms, default 250ms for snappy symbol typing). */
+    const val LONG_PRESS_MIN = 150
+    const val LONG_PRESS_MAX = 600
+
+    fun longPressDelayMs(c: Context): Long =
+        sp(c).getInt("long_press_ms", 250).coerceIn(LONG_PRESS_MIN, LONG_PRESS_MAX).toLong()
+
+    fun setLongPressDelayMs(c: Context, ms: Int) {
+        sp(c).edit().putInt("long_press_ms", ms.coerceIn(LONG_PRESS_MIN, LONG_PRESS_MAX)).apply()
     }
 
     /** Layouts the user switches via spacebar: 0 = English, 1 = Avro, 2 = Probhat, 3 = Jatiyo (never empty). */
