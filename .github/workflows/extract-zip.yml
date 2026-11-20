@@ -1,1 +1,87 @@
-v
+name: Auto Extract ZIP & Build APK
+
+on:
+  push:
+    paths:
+      - '*.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract-and-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Extract root ZIP file(s)
+        run: node extract-zip.js
+
+      - name: Commit and push extracted files to root
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Extract uploaded ZIP to repository root [skip ci]"
+            git push
+          fi
+
+      - name: Clone official OpenRidmik base (if My Avro project present)
+        if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        run: |
+          git clone --depth 1 https://github.com/devfahim00/OpenRidmik.git openridmik_base
+          python3 scripts/apply_to_openridmik.py openridmik_base
+
+      - name: Set up JDK 17
+        if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.9
+        if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Run Unit Tests & Assemble Debug APK
+        if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        working-directory: openridmik_base
+        run: |
+          gradle testDebugUnitTest assembleDebug --stacktrace \
+            -PappVersion="1.0.0" \
+            -PappVersionCode="${{ github.run_number }}"
+
+      - name: Upload MyAvroKeyboard-debug.apk artifact
+        if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyAvroKeyboard-debug
+          path: openridmik_base/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish debug APK to GitHub Releases
+        if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="debug-latest"
+          cp openridmik_base/app/build/outputs/apk/debug/app-debug.apk MyAvroKeyboard-debug.apk
+          gh release delete "$TAG" --cleanup-tag --yes || true
+          gh release create "$TAG" MyAvroKeyboard-debug.apk \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "My Avro Keyboard (Latest Debug Build)" \
+            --notes "Auto-extracted and built from uploaded ZIP."
