@@ -47,6 +47,8 @@ jobs:
 
       - name: Clone official OpenRidmik base (if My Avro project present)
         if: hashFiles('scripts/apply_to_openridmik.py') != ''
+        env:
+          MYAVRO_UPDATE_REPO: ${{ github.repository }}
         run: |
           git clone --depth 1 https://github.com/devfahim00/OpenRidmik.git openridmik_base
           python3 scripts/apply_to_openridmik.py openridmik_base
@@ -84,11 +86,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="debug-latest"
+          TAG="v1.0.${{ github.run_number }}"
           cp openridmik_base/app/build/outputs/apk/debug/app-debug.apk MyAvroKeyboard-debug.apk
           gh release delete "$TAG" --cleanup-tag --yes || true
           gh release create "$TAG" MyAvroKeyboard-debug.apk \
             --target "${GITHUB_SHA}" \
-            --prerelease \
-            --title "My Avro Keyboard (v1.0.${{ github.run_number }})" \
+            --title "My Avro Keyboard ${TAG}" \
             --notes "Auto-extracted and built from uploaded ZIP with consistent signing."
