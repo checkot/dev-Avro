@@ -7,6 +7,7 @@ Usage:
     python3 scripts/apply_to_openridmik.py <path-to-openridmik-repo>
 """
 
+import os
 import re
 import shutil
 import sys
@@ -536,6 +537,15 @@ def patch_settings_activity(target: Path) -> None:
         src = src.replace(SETTINGS_TITLE_OLD, SETTINGS_TITLE_NEW, 1)
     src = replace_once(src, SETTINGS_LANG_ANCHOR, SETTINGS_LANG_REPLACE, "SettingsActivity lang_dev", '"lang_dev"')
     src = replace_once(src, SETTINGS_DIAG_ANCHOR, SETTINGS_DEV_SECTION, "SettingsActivity dev section", "DeveloperSettingsActivity")
+    # Remove the upstream Telegram channel button cleanly
+    src = re.sub(
+        r'\n\s*// ---- telegram ----.*?(?=\n\s*setContentView\()',
+        "\n",
+        src,
+        flags=re.DOTALL,
+    )
+    src = src.replace('"Enable OpenRidmik"', '"Enable My Avro Keyboard"')
+    src = src.replace('Set OpenRidmik to', 'Set My Avro Keyboard to')
     if "private fun updateDevModeSummary()" not in src:
         last_brace = src.rfind("}")
         if last_brace == -1:
@@ -545,6 +555,19 @@ def patch_settings_activity(target: Path) -> None:
         src = src.replace("super.onResume()", "super.onResume()\n        updateDevModeSummary()", 1)
     act.write_text(src, encoding="utf-8")
     print("[OK] Patched SettingsActivity.kt")
+
+
+def patch_updater(target: Path) -> None:
+    upd = target / "app/src/main/java/com/devfahim00/openridmik/Updater.kt"
+    if not upd.exists():
+        return
+    src = upd.read_text(encoding="utf-8").replace("\r\n", "\n")
+    repo = os.environ.get("MYAVRO_UPDATE_REPO") or os.environ.get("GITHUB_REPOSITORY") or ""
+    if repo:
+        src = src.replace('private const val REPO = "devfahim00/OpenRidmik"', f'private const val REPO = "{repo}"')
+        print(f"[OK] Patched Updater.kt to check updates from {repo}")
+    src = src.replace('"OpenRidmik-updater"', '"MyAvroKeyboard-updater"')
+    upd.write_text(src, encoding="utf-8")
 
 
 def main() -> int:
@@ -567,6 +590,7 @@ def main() -> int:
     patch_keyboard_view(target)
     patch_openridmik_service(target)
     patch_settings_activity(target)
+    patch_updater(target)
 
     print("\nAll My Avro Keyboard modules and patches applied cleanly!")
     return 0
