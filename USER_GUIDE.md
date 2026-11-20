@@ -1,37 +1,42 @@
 # My Avro Keyboard — User Guide
 
-## 1. Normal Typing (Avro Phonetic)
-- Everything from OpenRidmik works out of the box: Avro phonetic Bangla, English, Probhat, Jatiyo, suggestions, emoji, clipboard history, and themes.
-- **Developer Mode is OFF by default**, so custom shortcuts will never interfere with normal typing until you turn it on.
+## 1. Getting Started & Normal Typing
+1. Install `MyAvroKeyboard-debug.apk` from Releases (or tap **Update available** inside the app for future versions).
+2. Open **My Avro Keyboard** → tap **Enable My Avro Keyboard** → turn it ON → tap **Switch keyboard** and pick **My Avro Keyboard**.
+3. **Switch layouts:** Hold and slide the **Spacebar** left or right to switch between **English**, **Avro**, **Probhat**, **Jatiyo**, and **Developer**.
+4. **Quick symbols:** Long-press any letter key to type its corner symbol (`৳`, `%`, `_`, `;`, `<`, `>`, `+`, `=`, `[`, `]`, `@`, `#`, `&`, `*`, `-`, `!`, `?`, `(`, `)`, `"`, `'`, `:`, `/`). Long-press `x` / `c` / `v` for Cut / Copy / Paste.
 
-## 2. Enabling Developer Mode
-1. Open the **My Avro Keyboard** app (or tap the gear icon on the keyboard toolbar).
-2. Scroll down to the **Developer Mode** section (separated from ordinary keyboard settings).
-3. Tap **Hardware Shortcuts & Macros**.
-4. Switch **Enable Developer Mode** to **ON**.
+## 2. Using the On-Screen PC Developer Layout
+1. Slide the **Spacebar** until it shows **Developer**.
+2. **Page 1 (PC Coding Layout):** Includes `Esc`, `Tab`, `Shift`, `Alt`, `⌘`, `Ctrl`, number/symbol row, and coding symbols on every letter key.
+   - Tap `Ctrl`, `Alt`, or `⌘` once to highlight it (sticky modifier), then tap the next key (e.g., `Ctrl` → `C`, `Ctrl` → `V`, `Ctrl` → `Z`, `Ctrl` → `L` in Termux).
+3. **Page 2 (Function Keys & Navigation):** Swipe your finger left or right across the main Developer keyboard body to switch to **Developer · Fn** (`F1–F12`, `↑ ↓ ← →`, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, `Cut`, `Copy`, `Paste`). Swipe again or tap **ABC** to return to Page 1.
 
-## 3. Creating a Custom Shortcut & Text Macro
-1. Inside **Developer Mode**, tap **+ Add Shortcut**.
-2. Choose your hardware key combination in either of two ways:
-   - **Live capture:** Tap **Capture Physical Keyboard Shortcut**, then press your physical Bluetooth/USB keyboard combo (for example, `Ctrl + Alt + M`).
-   - **Manual builder:** Tap the **Ctrl**, **Alt**, or **Shift** chips and tap **Pick Key** if your physical keyboard is not currently connected.
-3. Enter a readable **Shortcut Name** (e.g., `BMR Verification` or `Email Signature`).
-4. Enter your **Text Macro** (supports Bangla, English, multiple lines, and punctuation, up to 5,000 characters).
-   - Example 1: `Batch manufacturing record reviewed and verified.`
-   - Example 2:
-     ```text
-     Regards,
-     Md. Ariful Islam
-     ```
-5. Tap **Save Shortcut**.
+## 3. Setting Up Gemini AI Live Voice Typing
+1. Open **My Avro Keyboard** → scroll to **Developer Mode** → tap **AI Voice Typing (Gemini)**.
+2. Tap **Grant Microphone Permission** and select **Allow**.
+3. Tap **Get Free Key ↗** to create a free API key at [Google AI Studio](https://aistudio.google.com/apikey), paste it into the **Gemini API Key** box, and tap **Save**.
+4. Keep **Gemini Model ID** as `gemini-3.5-flash-lite` (fastest free-tier model; you can also use `gemini-3.6-flash` or `gemini-3.8-flash`).
+5. Choose your language mode (**Auto (BN+EN)**, **বাংলা**, or **English**) and tap **Save & Test Gemini Connection** to confirm `"Connected!"`.
+6. **How to dictate:** Tap the **Microphone icon** in the top-right corner of the keyboard:
+   - **Red + dot:** Live listening ON — speak naturally; pausing ~1 second after a sentence automatically types it while keeping the mic open.
+   - **Accent color (blue):** Finishing transcription of the last spoken phrase.
+   - **Tap Mic again:** Stops listening (icon returns to normal).
 
-## 4. Managing Existing Shortcuts
-- **Toggle on/off:** Use the switch on any shortcut card to disable or re-enable it individually without deleting it.
-- **Edit:** Tap **Edit** on a shortcut card to change its name, key combo, or macro text.
-- **Delete:** Tap **Delete** and confirm in the dialog.
-- All shortcuts are saved locally on your phone and automatically restored after restarting the app or rebooting your device.
+## 4. Custom Hardware Keyboard Shortcuts & Text Macros
+1. Open **My Avro Keyboard** → **Developer Mode** → **Hardware Shortcuts & Macros**.
+2. Turn **Enable Developer Mode** ON (default is OFF).
+3. Tap **+ Add Shortcut**:
+   - Capture a physical keyboard combo (e.g., `Ctrl + Alt + M`) or choose modifiers + key manually.
+   - Enter a readable **Shortcut Name** and your **Text Macro** (Bangla, English, multiline, up to 5,000 characters).
+   - Tap **Save Shortcut**.
+4. Shortcuts also work from the on-screen **Developer** keyboard when `Ctrl`/`Alt` is toggled ON.
 
-## 5. Safety & Privacy
-- **Password protection:** Macros are automatically blocked in password and PIN fields.
-- **Local only:** Your shortcuts and macros never leave your device and are never sent to any server.
-- **Avro-safe:** If you trigger a shortcut mid-word while typing Bangla phonetically, the keyboard cleanly commits your in-progress word first before inserting the macro.
+## 5. In-App Updates
+- Open **My Avro Keyboard** → tap **Check for updates** (or tap the **Update available** banner at the top).
+- The new APK downloads right inside the app with live percentage progress and opens Android's **Update** popup automatically (allow *"Install unknown apps"* once if prompted).
+
+## 6. Privacy & Safety
+- All shortcuts, macros, and your Gemini API key are stored locally on your device only.
+- Voice audio stays in memory only (never saved to storage) and is sent only to Google's Gemini API when you tap the Mic.
+- Both macros and voice typing are automatically blocked inside password and PIN fields.
