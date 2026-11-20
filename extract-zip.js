@@ -1,4 +1,3 @@
-
 #!/usr/bin/env node
 /**
  * Auto-extracts any .zip file uploaded to the repository root directly into the root,
