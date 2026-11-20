@@ -15,9 +15,18 @@ android {
         versionName = (project.findProperty("appVersion") as String?) ?: "1.0.0"
     }
 
-    // Release signing comes from the environment (set by the release workflow from repo secrets).
+    // Consistent debug keystore so future builds always install as an Update without uninstalling.
+    val debugKs = rootProject.file("signing/myavro-debug.keystore")
     val ksPath: String? = System.getenv("KEYSTORE_PATH")
     signingConfigs {
+        if (debugKs.exists()) {
+            getByName("debug") {
+                storeFile = debugKs
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
         if (ksPath != null) {
             create("release") {
                 storeFile = file(ksPath)

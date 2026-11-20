@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 OVERLAY_FILES = [
     "settings.gradle.kts",
+    "signing/myavro-debug.keystore",
     "app/build.gradle.kts",
     "app/src/main/AndroidManifest.xml",
     "app/src/main/res/values/strings.xml",
