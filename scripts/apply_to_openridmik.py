@@ -986,6 +986,76 @@ def patch_settings_activity(target: Path) -> None:
         src = src[:last_brace] + SETTINGS_HELPER_METHOD + "\n}\n"
     if "override fun onResume()" in src and "super.onResume()\n        updateDevModeSummary()" not in src:
         src = src.replace("super.onResume()", "super.onResume()\n        updateDevModeSummary()", 1)
+
+    # Phase 2: Cursor Control section (Spacebar hold cursor + Volume button cursor)
+    if '"spaceCursor"' not in src:
+        src = src.replace(
+            '// ---- developer mode (separated from ordinary keyboard settings) ----',
+            """// ---- cursor control ----
+        section("Cursor control")
+        val curCard = card()
+        toggleRow(curCard, true, "Spacebar hold cursor move", "spaceCursor")
+        run {
+            divider(curCard)
+            val dBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(16), dp(12), dp(16), dp(10))
+            }
+            val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val dVal = text("${Prefs.spaceCursorDelayMs(this)} ms", 14f, muted)
+            head.addView(text("Spacebar hold delay", 16f, fg), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            head.addView(dVal)
+            dBox.addView(head, lp())
+            val sb = SeekBar(this).apply {
+                max = (Prefs.SPACE_CURSOR_DELAY_MAX - Prefs.SPACE_CURSOR_DELAY_MIN) / 50
+                progress = ((Prefs.spaceCursorDelayMs(this@SettingsActivity).toInt() - Prefs.SPACE_CURSOR_DELAY_MIN) / 50)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                        val ms = Prefs.SPACE_CURSOR_DELAY_MIN + p * 50
+                        dVal.text = "$ms ms"
+                        if (fromUser) Prefs.setSpaceCursorDelayMs(this@SettingsActivity, ms)
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar?) {}
+                    override fun onStopTrackingTouch(s: SeekBar?) {}
+                })
+            }
+            dBox.addView(sb, lp(6))
+            curCard.addView(dBox, lp())
+        }
+        run {
+            divider(curCard)
+            val sBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(16), dp(12), dp(16), dp(10))
+            }
+            val head = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            val sVal = text("${Prefs.spaceCursorSpeed(this)}", 14f, muted)
+            head.addView(text("Spacebar cursor speed", 16f, fg), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            head.addView(sVal)
+            sBox.addView(head, lp())
+            val sb = SeekBar(this).apply {
+                max = (Prefs.SPACE_CURSOR_SPEED_MAX - Prefs.SPACE_CURSOR_SPEED_MIN) / 10
+                progress = ((Prefs.spaceCursorSpeed(this@SettingsActivity) - Prefs.SPACE_CURSOR_SPEED_MIN) / 10)
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                        val spd = Prefs.SPACE_CURSOR_SPEED_MIN + p * 10
+                        sVal.text = "$spd"
+                        if (fromUser) Prefs.setSpaceCursorSpeed(this@SettingsActivity, spd)
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar?) {}
+                    override fun onStopTrackingTouch(s: SeekBar?) {}
+                })
+            }
+            sBox.addView(sb, lp(6))
+            curCard.addView(sBox, lp())
+        }
+        toggleRow(curCard, false, "Volume button cursor", "volumeCursor")
+        toggleRow(curCard, false, "Disable volume cursor during media", "volumeCursorSkipMedia")
+
+        // ---- developer mode (separated from ordinary keyboard settings) ----""",
+            1,
+        )
+
     act.write_text(src, encoding="utf-8")
     print("[OK] Patched SettingsActivity.kt")
 
