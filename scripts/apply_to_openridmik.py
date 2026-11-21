@@ -343,7 +343,8 @@ SVC_FIELD_REPLACE = """    private var gearBtn: IconView? = null
     private var devCtrl = false
     private var devAlt = false
     private var devMeta = false
-    private var lastSpaceTap = 0L\n    private var devBtn: TextView? = null
+    private var lastSpaceTap = 0L
+    private var activePanel = 0\n    private var devBtn: TextView? = null
     private var micBtn: MicIconView? = null
     private var consumedShortcutKeyCode: Int = KeyEvent.KEYCODE_UNKNOWN"""
 
@@ -892,6 +893,81 @@ def patch_openridmik_service(target: Path) -> None:
             1,
         )
 
+
+    # Toolbar 1-tap open / 2nd-tap close toggles (Numpad, Clipboard, Emoji)
+    if "activePanel = 1" not in src:
+        src = src.replace(
+            """    private fun showNumpad() {
+        currentInputConnection?.let { finishComposing(it) }
+        if (panel != null) hidePanel()
+        clearBar()
+        mode = Mode.NUM
+        shift = 0
+        rebuild()
+    }""",
+            """    private fun showNumpad() {
+        currentInputConnection?.let { finishComposing(it) }
+        if (panel != null) hidePanel()
+        if (mode == Mode.NUM) {
+            mode = Mode.ALPHA
+            shift = 0
+            rebuild()
+            return
+        }
+        clearBar()
+        mode = Mode.NUM
+        shift = 0
+        rebuild()
+    }""",
+            1,
+        )
+        src = src.replace(
+            """    private fun showClipboard() {
+        if (panel != null) return
+        currentInputConnection?.let { finishComposing(it) }
+        captureClip()
+        openPanel(buildClipPanel())
+    }""",
+            """    private fun showClipboard() {
+        if (panel != null && activePanel == 1) {
+            hidePanel()
+            return
+        }
+        if (panel != null) hidePanel()
+        currentInputConnection?.let { finishComposing(it) }
+        captureClip()
+        activePanel = 1
+        openPanel(buildClipPanel())
+    }""",
+            1,
+        )
+        src = src.replace(
+            """    private fun showEmoji() {
+        if (panel != null) return
+        currentInputConnection?.let { finishComposing(it) }
+        openPanel(buildEmojiPanel())
+    }""",
+            """    private fun showEmoji() {
+        if (panel != null && activePanel == 2) {
+            hidePanel()
+            return
+        }
+        if (panel != null) hidePanel()
+        currentInputConnection?.let { finishComposing(it) }
+        activePanel = 2
+        openPanel(buildEmojiPanel())
+    }""",
+            1,
+        )
+        src = src.replace(
+            """        panel = null
+        clipList = null""",
+            """        panel = null
+        activePanel = 0
+        clipList = null""",
+            1,
+        )
+
     svc.write_text(src, encoding="utf-8")
     print("[OK] Patched OpenRidmikService.kt")
 
@@ -902,7 +978,7 @@ SETTINGS_CLASS_REPLACE = """class SettingsActivity : Activity() {
     private var voiceStatus: TextView? = null"""
 
 SETTINGS_TITLE_OLD = 'addView(text("OpenRidmik", 30f, fg, bold = true))'
-SETTINGS_TITLE_NEW = 'addView(text("My Avro Keyboard", 28f, fg, bold = true))'
+SETTINGS_TITLE_NEW = 'addView(text("Sum Keyboard", 28f, fg, bold = true))'
 
 SETTINGS_LANG_ANCHOR = '        langRow(false, "Probhat", "lang_probhat")'
 SETTINGS_LANG_REPLACE = """        langRow(false, "Probhat", "lang_probhat")"""
@@ -977,8 +1053,8 @@ def patch_settings_activity(target: Path) -> None:
         src,
         flags=re.DOTALL,
     )
-    src = src.replace('"Enable OpenRidmik"', '"Enable My Avro Keyboard"')
-    src = src.replace('Set OpenRidmik to', 'Set My Avro Keyboard to')
+    src = src.replace('"Enable OpenRidmik"', '"Enable Sum Keyboard"')
+    src = src.replace('Set OpenRidmik to', 'Set Sum Keyboard to')
     if "private fun updateDevModeSummary()" not in src:
         last_brace = src.rfind("}")
         if last_brace == -1:

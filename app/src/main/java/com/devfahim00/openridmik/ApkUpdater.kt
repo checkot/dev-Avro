@@ -14,7 +14,7 @@ import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Downloads the latest My Avro Keyboard APK in-app with live progress and
+ * Downloads the latest Sum Keyboard APK in-app with live progress and
  * launches Android's native package installer directly without leaving the app.
  */
 object ApkUpdater {
@@ -121,7 +121,7 @@ object ApkUpdater {
         if (!activity.packageManager.canRequestPackageInstalls()) {
             Toast.makeText(
                 activity,
-                "Allow 'Install unknown apps' for My Avro Keyboard, then tap Update again",
+                "Allow 'Install unknown apps' for Sum Keyboard, then tap Update again",
                 Toast.LENGTH_LONG,
             ).show()
             try {
