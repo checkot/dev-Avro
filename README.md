@@ -1,40 +1,36 @@
-# My Avro Keyboard
+# Sum Keyboard
 
-A fast, ad-free, open-source Android keyboard built on top of [OpenRidmik](https://github.com/devfahim00/OpenRidmik) (MIT License) with a **2-page on-screen PC Developer Layout**, **Gemini AI Live Voice Typing**, **custom hardware keyboard shortcuts & text macros**, **Ridmik-style symbol hints**, and **in-app updates**.
+**Sum Keyboard** is a fast, private, ad-free Bangla & English Android keyboard developed and maintained by **Md. Ariful Islam** ([`checkot/dev-Avro`](https://github.com/checkot/dev-Avro)).
+
+It combines smooth Avro phonetic Bangla typing with an on-screen PC Developer keyboard, Gemini AI Live Voice Typing, custom hardware keyboard shortcuts, pro cursor controls, and direct in-app updates.
 
 ## Key Features
 
-- **Avro Phonetic & Bangla Layouts:** Full Avro phonetic Bangla, English, Probhat, and Jatiyo layouts with 75,000-word suggestions, emoji panel, clipboard history, number pad, and customizable themes.
-- **Ridmik-Style Symbol Hints:** Quick long-press symbol hints (`৳`, `%`, `_`, `;`, `<`, `>`, `+`, `=`, `[`, `]`, `@`, `#`, `&`, `*`, `-`, `!`, `?`, `(`, `)`, `"`, `'`, `:`, `/`) across English and Avro layouts, plus `x`/`c`/`v` long-press cut/copy/paste.
-- **On-Screen PC Developer Layout (2 Swipeable Pages):**
-  - Tap the **`</>`** button in the top toolbar to switch to **Developer PC** layout (`Esc`, `Tab`, `Shift`, `Alt`, `⌘`, `Ctrl`, number/symbol row, and coding symbol hints).
-  - Tap the **`PC`** button in the top toolbar again to switch to **`Fn` (Page 2)** (`F1–F12`, `↑ ↓ ← →` arrow keys, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, and `Cut`/`Copy`/`Paste`).
-  - Every key dispatches real Android `KeyEvent`s with active `Ctrl`/`Alt`/`Shift`/`Meta` modifier states (ideal for Termux, code editors, and terminals).
-- **Developer Mode (Custom Hardware Shortcuts & Macros):**
-  - Default **OFF** so normal typing is never affected.
-  - Create, edit, toggle, and delete custom `Ctrl` / `Alt` / `Shift` shortcuts mapped to multiline Bangla or English text macros (stored locally on-device, blocked automatically in password/PIN fields).
+- **Avro Phonetic & Bangla Layouts:** Full Avro phonetic Bangla, English, Probhat, and Jatiyo layouts with word suggestions, emoji panel, clipboard history, and number pad.
+- **Quick Symbol Hints:** Long-press any letter key for fast symbols (`৳`, `%`, `_`, `;`, `<`, `>`, `+`, `=`, `[`, `]`, `@`, `#`, `&`, `*`, `-`, `!`, `?`, `(`, `)`, `"`, `'`, `:`, `/`), plus `x`/`c`/`v` long-press cut/copy/paste.
+- **1-Tap Open / 2nd-Tap Close Toolbar:** Tap Numpad, Clipboard, or Emoji once to open and tap again to close immediately.
+- **Top-Bar PC Developer Keyboard (`</>` → `PC` → `Fn`):**
+  - Tap **`</>`** in the top toolbar to open **PC Mode** (`Esc`, `Tab`, `Shift`, `Alt`, `⌘`, `Ctrl`, number/symbol row, coding hints).
+  - Tap **`PC`** again to open **Fn & Navigation Mode** (`F1–F12`, `↑ ↓ ← →`, `Home`, `End`, `PgUp`, `PgDn`, `Ins`, `Del`, `Cut`/`Copy`/`Paste`).
+  - Tap **`Fn`** again to return to normal typing.
 - **Gemini AI Live Auto-Pause Voice Typing:**
-  - Always-visible **1-tap Microphone icon** in the top-right corner of the keyboard.
-  - Continuous `AudioRecord` capture with **auto-pause detection (~1.1s)** that streams each spoken sentence to the Gemini API (`gemini-3.5-flash-lite` with `MINIMAL` thinking) and types in exact spoken order with smart auto-spacing.
-  - Supports **Auto (Bangla + English mixed)**, **বাংলা**, and **English** modes with optional smart punctuation cleanup. Uses your own free [Google AI Studio](https://aistudio.google.com/apikey) key stored strictly on-device; audio stays in RAM and is never saved to disk.
-- **In-App Updates & Seamless Signing:**
-  - Built-in **Check for updates** checks `checkot/dev-Avro` GitHub Releases, downloads the new APK in-app with live progress, and launches Android's installer directly.
-  - Signed with a consistent debug keystore (`signing/myavro-debug.keystore`) so new builds install directly as an **Update** without losing shortcuts or settings.
+  - Always-available **1-tap Microphone icon** in the top-right corner.
+  - Continuous `AudioRecord` capture with ~1.1s pause detection, `gemini-3.5-flash-lite` (`MINIMAL` thinking), smart auto-space, and Bangla + English mixed speech support.
+  - Uses your own free [Google AI Studio](https://aistudio.google.com/apikey) API key stored strictly on-device; audio stays in RAM only.
+- **Pro Cursor Controls:**
+  - **Spacebar Hold Cursor Move:** Hold Spacebar (~0.8s) and slide left/right to move the cursor accurately (adjustable delay & speed).
+  - **Volume Button Cursor:** Use Volume Up/Down keys to move the cursor while typing (automatically pauses during media playback).
+- **Custom Hardware Shortcuts & Text Macros:** Dedicated **Developer Mode** (OFF by default) to map physical keyboard combos (`Ctrl`/`Alt`/`Shift`) to multiline Bangla/English text macros, blocked automatically in password/PIN fields.
+- **12 Themes + Custom Colors:** Includes **Twilight Blossom**, **Midnight Aqua**, **Mystic Magenta**, **Black Pearl**, AMOLED, Ocean, Forest, Rose, Lavender, Sunset, Light, Dark, and System.
+- **Direct In-App Updates:** Checks [`checkot/dev-Avro`](https://github.com/checkot/dev-Avro/releases) Releases, downloads the APK in-app with live progress, and installs seamlessly using a consistent signing keystore.
 
-## Zero-PC Build & Deploy Pipeline
+## Maintenance & Build Workflows
 
-1. **Automated Drive → GitHub Deploy:** Dropping `MyAvroKeyboard-Project.zip` into the Google Drive `MyAvroDeploy` folder triggers the Apps Script bridge to push it to `checkot/dev-Avro` root (or upload manually via `maintenance.html`).
-2. **GitHub Actions (`.github/workflows/extract-zip.yml`):** Automatically extracts the ZIP via `extract-zip.js`, clones `devfahim00/OpenRidmik`, applies all modules and patches via `scripts/apply_to_openridmik.py`, runs JUnit tests, builds `MyAvroKeyboard-debug.apk` (`v1.0.x`), and publishes a GitHub Release.
+- **Main Release Build (`.github/workflows/extract-zip.yml`):** Automatically builds and publishes versioned `v1.0.x` APKs to [`checkot/dev-Avro/releases`](https://github.com/checkot/dev-Avro/releases).
+- **Nusai Keyboard Limited Edition (`.github/workflows/build-nusai-edition.yml`):** Optional manual workflow (`workflow_dispatch`) that builds an offline, one-time alphabetical **ABCD** edition (`Nusai Keyboard`, Avro + English only).
+- **Mobile Maintenance (`maintenance.html`):** Browser-based uploader and live build status dashboard for managing releases directly from Android.
 
-## PC / Android Studio Build (Optional)
+## Author & License
 
-```bash
-git clone https://github.com/devfahim00/OpenRidmik.git OpenRidmik
-python3 scripts/apply_to_openridmik.py OpenRidmik
-cd OpenRidmik
-gradle testDebugUnitTest assembleDebug
-```
-
-## License & Attribution
-
-Based on [OpenRidmik](https://github.com/devfahim00/OpenRidmik) © 2026 `devfahim00`, licensed under the MIT License. See `LICENSE` for full terms.
+Maintained by **Md. Ariful Islam** — [`github.com/checkot/dev-Avro`](https://github.com/checkot/dev-Avro).  
+Licensed under the **MIT License** (includes open-source MIT keyboard engine components; see [`LICENSE`](LICENSE) for full copyright notices).

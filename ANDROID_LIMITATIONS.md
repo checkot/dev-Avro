@@ -16,6 +16,6 @@ Android Input Method Editors (IMEs) do **not** have unrestricted global hotkey a
 - **`Ctrl + Alt + F1..F12`**
 
 ## Other Platform Notes
-- **Active IME Requirement:** Shortcuts only run while **My Avro Keyboard** is selected as the active Android keyboard and a text input field is focused.
+- **Active IME Requirement:** Shortcuts only run while **Sum Keyboard** is selected as the active Android keyboard and a text input field is focused.
 - **Password & PIN Fields:** Macros are intentionally blocked in password and numeric-PIN fields for security.
 - **Text Selection:** Standard Android text fields replace selected text when `commitText` is called; a few custom non-standard editors (such as canvas-based games or webview editors) may append instead.
