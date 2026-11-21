@@ -15,6 +15,9 @@ object Prefs {
         "doubleSpaceTab" to false,
         "keyPopup" to true,
         "hideHints" to false,
+        "spaceCursor" to true,
+        "volumeCursor" to false,
+        "volumeCursorSkipMedia" to true,
         "lang_en" to true,
         "lang_avro" to true,
         "lang_probhat" to false,
@@ -46,6 +49,28 @@ object Prefs {
 
     fun setLongPressDelayMs(c: Context, ms: Int) {
         sp(c).edit().putInt("long_press_ms", ms.coerceIn(LONG_PRESS_MIN, LONG_PRESS_MAX)).apply()
+    }
+
+    /** Spacebar long-press cursor hold delay (300ms - 1500ms, default 800ms). */
+    const val SPACE_CURSOR_DELAY_MIN = 300
+    const val SPACE_CURSOR_DELAY_MAX = 1500
+
+    fun spaceCursorDelayMs(c: Context): Long =
+        sp(c).getInt("space_cursor_delay_ms", 800).coerceIn(SPACE_CURSOR_DELAY_MIN, SPACE_CURSOR_DELAY_MAX).toLong()
+
+    fun setSpaceCursorDelayMs(c: Context, ms: Int) {
+        sp(c).edit().putInt("space_cursor_delay_ms", ms.coerceIn(SPACE_CURSOR_DELAY_MIN, SPACE_CURSOR_DELAY_MAX)).apply()
+    }
+
+    /** Spacebar cursor slide speed (100 - 500, default 250). */
+    const val SPACE_CURSOR_SPEED_MIN = 100
+    const val SPACE_CURSOR_SPEED_MAX = 500
+
+    fun spaceCursorSpeed(c: Context): Int =
+        sp(c).getInt("space_cursor_speed", 250).coerceIn(SPACE_CURSOR_SPEED_MIN, SPACE_CURSOR_SPEED_MAX)
+
+    fun setSpaceCursorSpeed(c: Context, speed: Int) {
+        sp(c).edit().putInt("space_cursor_speed", speed.coerceIn(SPACE_CURSOR_SPEED_MIN, SPACE_CURSOR_SPEED_MAX)).apply()
     }
 
     /** Layouts the user switches via spacebar: 0 = English, 1 = Avro, 2 = Probhat, 3 = Jatiyo (never empty). */

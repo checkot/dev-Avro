@@ -224,6 +224,114 @@ def patch_keyboard_view(target: Path) -> None:
         )
         src = src.replace("handler.postDelayed(p.longRun, 420)", "handler.postDelayed(p.longRun, longPressMs)")
 
+
+    # Phase 2: Spacebar long-press + slide cursor control
+    if "fun onCursorMove" not in src:
+        src = src.replace(
+            "fun onBoardSwipe(dir: Int) {}",
+            """fun onBoardSwipe(dir: Int) {}
+
+        /** Spacebar held then dragged sideways to move text cursor (-1 left, +1 right). */
+        fun onCursorMove(dir: Int) {}""",
+            1,
+        )
+        src = src.replace(
+            "    var longPressMs = 250L",
+            """    var longPressMs = 250L
+    var spaceCursorEnabled = true
+    var spaceCursorDelayMs = 800L
+    var spaceCursorSpeed = 250
+    private var spaceCursorId = -1
+    private var spaceCursorActive = false
+    private var spaceCursorLastX = 0f
+    private val spaceCursorArmRun = Runnable {
+        if (spaceCursorId != -1) {
+            spaceCursorActive = true
+            if (haptic) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            invalidate()
+        }
+    }""",
+            1,
+        )
+        src = src.replace(
+            "        if (p.key.code == Codes.SPACE && !p.longDone) {",
+            """        if (p.key.code == Codes.SPACE && spaceCursorActive && id == spaceCursorId) {
+            val stepPx = dp(24f) * (250f / spaceCursorSpeed.coerceIn(100, 500))
+            val delta = x - spaceCursorLastX
+            if (Math.abs(delta) >= stepPx) {
+                val steps = (delta / stepPx).toInt()
+                val dir = if (steps > 0) 1 else -1
+                val count = Math.abs(steps).coerceAtMost(6)
+                for (n in 0 until count) {
+                    listener?.onCursorMove(dir)
+                }
+                spaceCursorLastX += steps * stepPx
+                if (haptic) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+            return
+        }
+        if (p.key.code == Codes.SPACE && !p.longDone) {
+            if (Math.abs(x - p.startX) > dp(16f) && id == spaceCursorId && !spaceCursorActive) {
+                handler.removeCallbacks(spaceCursorArmRun)
+                spaceCursorId = -1
+            }""",
+            1,
+        )
+        src = src.replace(
+            "        if (boardSwipeEnabled && h.first.code != Codes.SPACE && !h.first.repeat) {",
+            """        if (spaceCursorEnabled && h.first.code == Codes.SPACE) {
+            handler.removeCallbacks(spaceCursorArmRun)
+            spaceCursorId = id
+            spaceCursorActive = false
+            spaceCursorLastX = x
+            handler.postDelayed(spaceCursorArmRun, spaceCursorDelayMs)
+        }
+        if (boardSwipeEnabled && h.first.code != Codes.SPACE && !h.first.repeat) {""",
+            1,
+        )
+        src = src.replace(
+            """        if (id == boardSwipeId) {
+            boardSwipeId = -1
+            boardSwipeFired = false
+        }""",
+            """        if (id == boardSwipeId) {
+            boardSwipeId = -1
+            boardSwipeFired = false
+        }
+        val wasSpaceCursor = (id == spaceCursorId && spaceCursorActive)
+        if (id == spaceCursorId) {
+            handler.removeCallbacks(spaceCursorArmRun)
+            spaceCursorId = -1
+            spaceCursorActive = false
+        }""",
+            1,
+        )
+        src = src.replace(
+            "        if (!p.longDone && !p.fired && !p.swiping) listener?.onKey(p.key)",
+            "        if (!p.longDone && !p.fired && !p.swiping && !wasSpaceCursor) listener?.onKey(p.key)",
+            1,
+        )
+        src = src.replace(
+            """        boardSwipeId = -1
+        boardSwipeFired = false""",
+            """        boardSwipeId = -1
+        boardSwipeFired = false
+        handler.removeCallbacks(spaceCursorArmRun)
+        spaceCursorId = -1
+        spaceCursorActive = false""",
+            1,
+        )
+        src = src.replace(
+            "                if (p.key.code == Codes.SPACE) drawSwipePreview(canvas, p)",
+            """                if (p.key.code == Codes.SPACE) drawSwipePreview(canvas, p)
+            } else if (spaceCursorActive && p.key.code == Codes.SPACE) {
+                val saved = spaceLabel
+                spaceLabel = "◀ Cursor ▶"
+                drawSwipePreview(canvas, p)
+                spaceLabel = saved""",
+            1,
+        )
+
     kv.write_text(src, encoding="utf-8")
     print("[OK] Patched KeyboardView.kt")
 
@@ -733,6 +841,54 @@ def patch_openridmik_service(target: Path) -> None:
             }
             return
         }""",
+            1,
+        )
+
+
+    # Phase 2: Spacebar cursor move + Volume button cursor control
+    if "override fun onCursorMove" not in src:
+        src = src.replace(
+            "        kbView.longPressMs = Prefs.longPressDelayMs(this)",
+            """        kbView.longPressMs = Prefs.longPressDelayMs(this)
+        kbView.spaceCursorEnabled = Prefs.get(this, "spaceCursor")
+        kbView.spaceCursorDelayMs = Prefs.spaceCursorDelayMs(this)
+        kbView.spaceCursorSpeed = Prefs.spaceCursorSpeed(this)""",
+            1,
+        )
+        src = src.replace(
+            """    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (event == null || !Prefs.isDeveloperMode(this)) {""",
+            """    private fun shouldUseVolumeCursor(keyCode: Int): Boolean {
+        if (keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) return false
+        if (!isInputViewShown || !Prefs.get(this, "volumeCursor")) return false
+        if (Prefs.get(this, "volumeCursorSkipMedia")) {
+            val am = audio ?: (getSystemService(AUDIO_SERVICE) as? AudioManager)
+            if (am?.isMusicActive == true) return false
+        }
+        return currentInputConnection != null
+    }
+
+    override fun onCursorMove(dir: Int) {
+        val ic = currentInputConnection ?: return
+        if (raw.isNotEmpty()) finishComposing(ic)
+        val key = if (dir < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT
+        DeveloperKeyboard.sendKey(ic, key, false, false, false, false)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (shouldUseVolumeCursor(keyCode)) {
+            onCursorMove(if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) -1 else 1)
+            return true
+        }
+        if (event == null || !Prefs.isDeveloperMode(this)) {""",
+            1,
+        )
+        src = src.replace(
+            """    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (consumedShortcutKeyCode != KeyEvent.KEYCODE_UNKNOWN && consumedShortcutKeyCode == keyCode) {""",
+            """    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (shouldUseVolumeCursor(keyCode)) return true
+        if (consumedShortcutKeyCode != KeyEvent.KEYCODE_UNKNOWN && consumedShortcutKeyCode == keyCode) {""",
             1,
         )
 
