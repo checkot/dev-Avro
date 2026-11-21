@@ -1,0 +1,56 @@
+name: Build Nusai Keyboard (ABCD Limited Edition)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-nusai:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Clone official OpenRidmik base (MIT License)
+        run: |
+          git clone --depth 1 https://github.com/devfahim00/OpenRidmik.git openridmik_nusai
+
+      - name: Apply Nusai Keyboard (One-Time ABCD Limited Edition)
+        run: |
+          python3 scripts/apply_nusai_edition.py openridmik_nusai
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Assemble Nusai Keyboard APK
+        working-directory: openridmik_nusai
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload NusaiKeyboard APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NusaiKeyboard-v1.0.0-Limited
+          path: openridmik_nusai/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish Nusai Keyboard Limited Edition (prerelease so main latest is untouched)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="nusai-v1.0.0"
+          cp openridmik_nusai/app/build/outputs/apk/debug/app-debug.apk NusaiKeyboard-v1.0.0-Limited.apk
+          gh release delete "$TAG" --cleanup-tag --yes || true
+          gh release create "$TAG" NusaiKeyboard-v1.0.0-Limited.apk \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "Nusai Keyboard — ABCD Limited Edition (v1.0.0)" \
+            --notes "One-time offline ABCD edition (Avro + English only, no Developer Mode, no auto-updates)."
