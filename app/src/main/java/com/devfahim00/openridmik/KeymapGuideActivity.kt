@@ -11,7 +11,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 
 /**
- * Avro Phonetic & Keyboard Typing Guide migrated from the keyboard toolbar book icon
+ * Official Avro Phonetic & Keyboard Typing Guide migrated from the keyboard toolbar book icon
  * into Settings so the toolbar slot can be dedicated to Developer PC & Fn modes.
  */
 class KeymapGuideActivity : Activity() {
@@ -80,7 +80,7 @@ class KeymapGuideActivity : Activity() {
         val titleCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(text("Avro Typing Guide", 24f, fg, bold = true))
-            addView(text("Phonetic Bangla rules & quick keyboard gestures", 13f, muted))
+            addView(text("Official OmicronLab Avro Phonetic rules & gestures", 13f, muted))
         }
         topBar.addView(backBtn)
         topBar.addView(titleCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -92,10 +92,10 @@ class KeymapGuideActivity : Activity() {
             listOf(
                 "o → অ" to "a → আ",
                 "i → ই" to "I / ee → ঈ",
-                "u → উ" to "U / oo → ঊ",
+                "u / oo → উ" to "U → ঊ",
                 "rri → ঋ" to "e → এ",
                 "OI → ঐ" to "O → ও",
-                "OU → ঔ" to "` (backtick) → break kar",
+                "OU → ঔ" to "oZa / aZ → অ্যা",
             ),
         )
 
@@ -110,18 +110,30 @@ class KeymapGuideActivity : Activity() {
                 "p → প   ph/f → ফ" to "b → ব   bh/v → ভ   m → ম",
                 "z → য   r → র" to "l → ল   sh/S → শ   Sh → ষ",
                 "s → স   h → হ" to "R → ড়   Rh → ঢ়   y → য়",
-                "t`` → ৎ   ng → ং" to ": → ঃ   ^ → ঁ",
+                "t`` → ৎ   ng → ং" to ": → ঃ   ^ → ঁ   $ → ৳",
             ),
         )
 
         addSection(
             root,
-            "COMMON EXAMPLES",
+            "OFFICIAL AVRO COMBOS & PUNCTUATION",
             listOf(
-                "ami → আমি" to "bangla → বাংলা",
-                "desh → দেশ" to "kemon → কেমন",
-                "dhonnobad → ধন্যবাদ" to "bhalobasha → ভালোবাসা",
-                "proshno → প্রশ্ন" to "shikkha → শিক্ষা",
+                ",, → ্ (Hasanta)" to "rr + cons → র্ (Ref)",
+                "kx / kkh / kSh → ক্ষ" to "gg / GG / gny → জ্ঞ",
+                "nk / Ngk → ঙ্ক" to "w (after cons) → ্ব (ব-ফলা)",
+                "Z / y (after cons) → ্য" to "rZ → র\u200D্য (e.g. rZab → র\u200D্যাব)",
+                ". → ।   .` → ." to ": → ঃ   :` → :   ` → break",
+            ),
+        )
+
+        addSection(
+            root,
+            "AUTO-CORRECT EXAMPLES",
+            listOf(
+                "amra → আমরা" to "ekTa → একটা",
+                "bangla → বাংলা" to "korbo → করবো",
+                "boi → বই   bOI → বৈ" to "bou → বউ   bOU → বৌ",
+                "korrmo → কর্ম" to "facebook → ফেসবুক",
             ),
         )
 

@@ -21,6 +21,8 @@ OVERLAY_FILES = [
     "app/build.gradle.kts",
     "app/src/main/AndroidManifest.xml",
     "app/src/main/res/values/strings.xml",
+    "app/src/main/assets/avro_rules.txt",
+    "app/src/main/java/com/devfahim00/openridmik/AvroEngine.kt",
     "app/src/main/java/com/devfahim00/openridmik/Prefs.kt",
     "app/src/main/java/com/devfahim00/openridmik/Theme.kt",
     "app/src/main/java/com/devfahim00/openridmik/ApkFileProvider.kt",
@@ -36,6 +38,7 @@ OVERLAY_FILES = [
     "app/src/main/java/com/devfahim00/openridmik/DeveloperSettingsActivity.kt",
     "app/src/main/java/com/devfahim00/openridmik/ShortcutCaptureActivity.kt",
     "app/src/test/java/com/devfahim00/openridmik/ShortcutLogicTest.kt",
+    "app/src/test/java/com/devfahim00/openridmik/AvroEngineTest.kt",
 ]
 
 

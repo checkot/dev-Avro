@@ -1,0 +1,103 @@
+# Official OmicronLab Avro Phonetic Rules for Sum Keyboard
+# Format: <Type> <LatinKey> <StandaloneValue> [KarOrJoinerValue]
+# Types: V = Vowel, C = Consonant, W = b-fola joiner, J = j-fola joiner, S = Symbol
+
+# Vowels (স্বরবর্ণ) - Official Avro Phonetic case rules
+V o অ -
+V a আ া
+V i ই ি
+V I ঈ ী
+V ee ঈ ী
+V u উ ু
+V oo উ ু
+V U ঊ ূ
+V rri ঋ ৃ
+V e এ ে
+V OI ঐ ৈ
+V O ও ো
+V OU ঔ ৌ
+
+# Consonants (ব্যঞ্জনবর্ণ)
+C k ক
+C kh খ
+C g গ
+C gh ঘ
+C Ng ঙ
+C c চ
+C ch ছ
+C chh ছ
+C j জ
+C jh ঝ
+C NG ঞ
+C T ট
+C Th ঠ
+C D ড
+C Dh ঢ
+C N ণ
+C t ত
+C th থ
+C d দ
+C dh ধ
+C n ন
+C p প
+C ph ফ
+C f ফ
+C b ব
+C bh ভ
+C v ভ
+C m ম
+C z য
+C r র
+C l ল
+C sh শ
+C S শ
+C Sh ষ
+C s স
+C h হ
+C R ড়
+C Rh ঢ়
+C q ক
+C x ক্স
+
+# Official Avro Conjunct Combos (যুক্তবর্ণ)
+C kkh ক্ষ
+C kx ক্ষ
+C kSh ক্ষ
+C GG জ্ঞ
+C gg জ্ঞ
+C gny জ্ঞ
+C nk ঙ্ক
+C Ngk ঙ্ক
+C ngk ঙ্ক
+C Ngkh ঙ্খ
+C ngkh ঙ্খ
+C Ngg ঙ্গ
+C ngg ঙ্গ
+C Nggh ঙ্ঘ
+C nggh ঙ্ঘ
+C Ngm ঙ্ম
+C ngm ঙ্ম
+C nj ঞ্জ
+C nc ঞ্চ
+C nch ঞ্ছ
+C njh ঞ্ঝ
+
+# Joiners (ফলা)
+J y য় য
+J Y য় য
+J Z য য
+W w ও ব
+
+# Symbols & Punctuation (চিহ্ন)
+S ng ং
+S : ঃ
+S :` :
+S ^ ঁ
+S ,, ্
+S qq ্
+S . ।
+S .` .
+S .. .
+S $ ৳
+S t`` ৎ
+S ` -
